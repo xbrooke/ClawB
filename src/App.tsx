@@ -41,18 +41,28 @@ export default function App() {
 
       <Sidebar current={page} onChange={handlePageChange} />
 
-      <main style={{ flex: 1, height: "100%", position: "relative", display: "flex", flexDirection: "column" }}>
+      <main
+        style={{
+          flex: 1,
+          height: "100%",
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
 
-        {/* Page content */}
-        <div style={{ flex: 1, position: "relative", padding: 24, overflowY: "auto" }}>
+        <div style={{ flex: 1, position: "relative", padding: "var(--content-padding)", overflowY: "auto" }}>
           {visitedPages.map((entry) => (
             <div
               key={entry}
               style={{
                 position: "absolute",
                 inset: 0,
+                paddingRight: "var(--content-padding)",
                 display: page === entry ? "block" : "none",
                 animation: page === entry ? "fadeIn 0.2s ease-in-out" : "",
+                overflowY: "auto",
               }}
             >
               {pageContent[entry]}
