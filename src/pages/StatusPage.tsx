@@ -298,8 +298,8 @@ export function StatusPage({ onNavigate }: StatusPageProps) {
     },
     {
       key: "platform",
-      title: "配置平台",
-      detail: platformConfigured ? `${platformName} 已配置完成。` : "去平台页配置插件。",
+      title: "配置消息渠道",
+      detail: platformConfigured ? `${platformName} 已配置完成。` : "去消息渠道页配置插件。",
       state: platformConfigured ? "done" : isInstalled && modelConfigured ? "current" : "pending",
     },
     {
@@ -328,9 +328,9 @@ export function StatusPage({ onNavigate }: StatusPageProps) {
     nextStepDescription = "去接入模型";
     nextStepAction = <AppButton onClick={() => onNavigate("config")}>去模型接入</AppButton>;
   } else if (!platformConfigured) {
-    nextStepTitle = "下一步：配置平台";
+    nextStepTitle = "下一步：配置消息渠道";
     nextStepDescription = "去填微信或飞书";
-    nextStepAction = <AppButton onClick={() => onNavigate("platforms")}>去平台</AppButton>;
+    nextStepAction = <AppButton onClick={() => onNavigate("platforms")}>去配置</AppButton>;
   } else if (!isRunning) {
     nextStepTitle = "下一步：启动网关";
     nextStepDescription = "启动后才能在线";
