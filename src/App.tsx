@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Sidebar, type Page } from "./components/Sidebar";
+import { TitleBar } from "./components/TitleBar";
 import { StatusPage } from "./pages/StatusPage";
 import { DiagnosisPage } from "./pages/DiagnosisPage";
 import { ConfigPage } from "./pages/ConfigPage";
@@ -31,46 +32,54 @@ export default function App() {
     <div
       style={{
         display: "flex",
-        flexDirection: "row",
+        flexDirection: "column",
         height: "100vh",
         width: "100vw",
         overflow: "hidden",
         background: "var(--window-bg)",
       }}
     >
+      <TitleBar />
 
-      <Sidebar current={page} onChange={handlePageChange} />
-
-      <main
+      <div
         style={{
-          flex: 1,
-          height: "100%",
-          position: "relative",
           display: "flex",
-          flexDirection: "column",
+          flexDirection: "row",
+          flex: 1,
           overflow: "hidden",
         }}
       >
+        <Sidebar current={page} onChange={handlePageChange} />
 
-        <div style={{ flex: 1, position: "relative", padding: "var(--content-padding)", overflowY: "auto" }}>
-          {visitedPages.map((entry) => (
-            <div
-              key={entry}
-              style={{
-                position: "absolute",
-                inset: 0,
-                paddingRight: "var(--content-padding)",
-                display: page === entry ? "block" : "none",
-                animation: page === entry ? "fadeIn 0.2s ease-in-out" : "",
-                overflowY: "auto",
-              }}
-            >
-              {pageContent[entry]}
-            </div>
-          ))}
-        </div>
-
-      </main>
+        <main
+          style={{
+            flex: 1,
+            height: "100%",
+            position: "relative",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ flex: 1, position: "relative", padding: "var(--content-padding)", overflowY: "auto" }}>
+            {visitedPages.map((entry) => (
+              <div
+                key={entry}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  paddingRight: "var(--content-padding)",
+                  display: page === entry ? "block" : "none",
+                  animation: page === entry ? "fadeIn 0.2s ease-in-out" : "",
+                  overflowY: "auto",
+                }}
+              >
+                {pageContent[entry]}
+              </div>
+            ))}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
