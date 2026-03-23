@@ -1,6 +1,10 @@
 use std::process::{Output, Stdio};
 use tokio::process::{Child, Command};
 
+#[cfg(target_os = "windows")]
+pub const SHELL_PATH_PREFIX: &str = r#"set "PATH=C:\Program Files\nodejs;C:\Program Files\Git\cmd;C:\Program Files\Git\bin;%PATH""#;
+
+#[cfg(not(target_os = "windows"))]
 pub const SHELL_PATH_PREFIX: &str = r#"export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:$HOME/.local/bin:$PATH""#;
 
 pub fn with_shell_path(command: &str) -> String {
@@ -52,6 +56,16 @@ pub async fn run_shell(command: &str) -> Result<String, String> {
     }
 }
 
+#[cfg(target_os = "windows")]
+pub async fn run_shell_output(command: &str) -> Result<Output, String> {
+    Command::new("cmd")
+        .args(["/C", &with_shell_path(command)])
+        .output()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
 pub async fn run_shell_output(command: &str) -> Result<Output, String> {
     Command::new("sh")
         .arg("-c")
@@ -61,6 +75,17 @@ pub async fn run_shell_output(command: &str) -> Result<Output, String> {
         .map_err(|e| e.to_string())
 }
 
+#[cfg(target_os = "windows")]
+pub fn spawn_shell(command: &str) -> Result<Child, String> {
+    Command::new("cmd")
+        .args(["/C", &with_shell_path(command)])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
 pub fn spawn_shell(command: &str) -> Result<Child, String> {
     Command::new("sh")
         .arg("-c")

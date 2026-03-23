@@ -24,4 +24,6 @@ dirs = "5"
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1"
 reqwest = { version = "0.12", features = ["json"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
 window-vibrancy = "0.7"
