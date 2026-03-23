@@ -4,6 +4,7 @@ use dirs::home_dir;
 use std::path::PathBuf;
 use tauri::Emitter;
 use tokio::fs;
+use tokio::io::AsyncBufReadExt;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct DayUsage {
@@ -884,7 +885,7 @@ pub async fn test_feishu_connection(app_id: String, app_secret: String) -> Resul
 
 #[tauri::command]
 pub async fn install_weixin_plugin(window: tauri::Window) -> Result<(), String> {
-    let child = tokio::process::Command::new("npx")
+    let mut child = tokio::process::Command::new("npx")
         .args(["-y", "@tencent-weixin/openclaw-weixin-cli@latest", "install"])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -892,9 +893,10 @@ pub async fn install_weixin_plugin(window: tauri::Window) -> Result<(), String> 
         .map_err(|e| e.to_string())?;
 
     let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
-    let mut reader = tokio::io::BufReader::new(stdout).lines();
+    let reader = tokio::io::BufReader::new(stdout);
+    let mut lines = reader.lines();
 
-    while let Some(line) = reader.next_line().await.map_err(|e| e.to_string())? {
+    while let Ok(Some(line)) = lines.next_line().await {
         window.emit("install-output", &line).map_err(|e| e.to_string())?;
     }
 
