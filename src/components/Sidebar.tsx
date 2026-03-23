@@ -69,19 +69,33 @@ export function Sidebar({ current, onChange }: SidebarProps) {
         <svg
           width="28"
           height="28"
-          viewBox="0 0 32 32"
+          viewBox="42 38 168 176"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <rect width="32" height="32" rx="8" fill="var(--accent-blue)" />
           <path
-            d="M10 22L16 10L22 22"
-            stroke="white"
-            strokeWidth="2.5"
+            d="M 70 160 C 40 110, 90 40, 150 50 C 145 70, 130 100, 135 125 C 140 140, 180 100, 200 80 C 220 100, 160 180, 105 195"
+            stroke="var(--accent-blue)"
+            strokeWidth="12"
+            strokeLinecap="butt"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M 56 164 L 71 179 L 56 194"
+            stroke="var(--accent-blue)"
+            strokeWidth="10"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-          <circle cx="16" cy="19" r="2" fill="white" />
+          <line
+            x1="76"
+            y1="194"
+            x2="96"
+            y2="194"
+            stroke="var(--accent-blue)"
+            strokeWidth="10"
+            strokeLinecap="butt"
+          />
         </svg>
         <span
           style={{
