@@ -3,6 +3,20 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { BindChannel, ChannelStatus, BindStatus, SendPayload } from "./types";
 import { ChannelError } from "./types";
 
+/**
+ * WeChat Channel - Binding-based channel using QR code authentication.
+ *
+ * Bind States:
+ * - unbound: User has not bound their WeChat account
+ * - binding: QR code scanning in progress
+ * - bound: WeChat account successfully bound, can send/receive messages
+ * - error: Binding failed or lost, re-bind required
+ *
+ * Requirements:
+ * - QR code binding mechanism MUST be preserved
+ * - Messages cannot be sent when unbound (enforced by validate() and send())
+ * - Unbinding requires proper cleanup of plugin state
+ */
 export class WeChatChannel implements BindChannel {
   readonly id = "weixin";
   readonly name = "微信";
@@ -42,6 +56,14 @@ export class WeChatChannel implements BindChannel {
       this.bindStatus = "error";
       return "error";
     }
+  }
+
+  /**
+   * Force refresh bind status from backend.
+   * Useful when the plugin state may have changed externally.
+   */
+  async refreshBindStatus(): Promise<BindStatus> {
+    return this.getBindStatus();
   }
 
   async validate(): Promise<boolean> {
