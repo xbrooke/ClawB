@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Play,
-  Square,
   CheckCircle2,
   Circle,
   ArrowRightCircle,
@@ -12,8 +10,6 @@ import {
   checkOpenclawInstalled,
   readConfig,
   readModelAuthStatus,
-  startGateway,
-  stopGateway,
   getWeixinPluginStatus,
   type GatewayStatus,
   type InstallInfo,
@@ -123,7 +119,6 @@ export function StatusPage({ onNavigate }: StatusPageProps) {
   const [config, setConfig] = useState<OpenClawConfig>(() => statusPageCache?.config ?? {});
   const [modelAuth, setModelAuth] = useState<ModelAuthStatus | null>(() => statusPageCache?.modelAuth ?? null);
   const [weixinPluginStatus, setWeixinPluginStatus] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(Boolean(statusPageCache));
 
@@ -173,32 +168,6 @@ export function StatusPage({ onNavigate }: StatusPageProps) {
     refresh();
     const timer = setInterval(refresh, 10000);
     return () => clearInterval(timer);
-  }, [refresh]);
-
-  const handleStart = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await startGateway();
-      await refresh();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [refresh]);
-
-  const handleStop = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await stopGateway();
-      await refresh();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
   }, [refresh]);
 
   const isInstalled = info?.installed ?? false;
@@ -259,13 +228,8 @@ export function StatusPage({ onNavigate }: StatusPageProps) {
     nextStepAction = <AppButton onClick={() => onNavigate("platforms")}>去配置</AppButton>;
   } else if (!isRunning) {
     nextStepTitle = "下一步：启动网关";
-    nextStepDescription = "启动后才能在线";
-    nextStepAction = (
-      <AppButton onClick={handleStart} disabled={loading} tone="green">
-        <Play size={14} />
-        {loading ? "启动中…" : "启动网关"}
-      </AppButton>
-    );
+    nextStepDescription = "去环境安装页启动";
+    nextStepAction = <AppButton onClick={() => onNavigate("install")}>去环境安装</AppButton>;
   }
 
   if (!initialized) {
@@ -423,10 +387,10 @@ export function StatusPage({ onNavigate }: StatusPageProps) {
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span className={`status-dot ${loading ? "loading" : isRunning ? "running" : "stopped"}`} />
+              <span className={`status-dot ${isRunning ? "running" : "stopped"}`} />
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-                  {loading ? "处理中…" : isRunning ? "运行中" : "已停止"}
+                  {isRunning ? "运行中" : "已停止"}
                 </div>
                 {status?.pid && isRunning && (
                   <div style={{ fontSize: 12, marginTop: 4, color: "var(--text-tertiary)" }}>PID {status.pid}</div>
@@ -435,17 +399,9 @@ export function StatusPage({ onNavigate }: StatusPageProps) {
             </div>
 
             <div style={{ display: "flex", gap: 8 }}>
-              {isRunning ? (
-                <AppButton onClick={handleStop} disabled={loading} tone="redSubtle" size="sm">
-                  <Square size={12} />
-                  停止
-                </AppButton>
-              ) : (
-                <AppButton onClick={handleStart} disabled={loading || !gatewayReady} tone="green" size="sm">
-                  <Play size={12} />
-                  启动
-                </AppButton>
-              )}
+              <AppButton onClick={() => onNavigate("install")} size="sm">
+                去环境安装页管理网关
+              </AppButton>
             </div>
           </div>
 
