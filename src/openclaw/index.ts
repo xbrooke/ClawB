@@ -1,13 +1,15 @@
 /**
- * OpenClaw Module - Main Entry Point
+ * OpenClaw Module - Simplified Entry Point
  */
 
-// Re-export platform and detect
-export * from "./platform";
-export * from "./detect";
-
-// Re-export gateway (includes isGatewayRunning)
-export * from "./gateway";
-
-// Re-export install
-export * from "./install";
+export { InstallState, detect } from "./detect";
+export type { DetectionResult } from "./detect";
+export { getStatus, isRunning } from "./gateway";
+export {
+  installOpenClaw,
+  onboardOpenClaw,
+  startGateway,
+  stopGateway,
+  restartGateway,
+  installGateway,
+} from "./install";
