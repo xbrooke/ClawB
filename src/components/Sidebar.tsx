@@ -3,16 +3,18 @@ import { Activity, Settings, Puzzle, BarChart3, MessageSquare, Stethoscope, Info
 
 export type Page = "status" | "config" | "platforms" | "skills" | "usage" | "diagnosis" | "about" | "install";
 
-const navItems: { id: Page; label: string; Icon: LucideIcon }[] = [
+const navItems: { id: Page; label: string; Icon: LucideIcon; visible?: boolean }[] = [
   { id: "status", label: "仪表盘", Icon: Activity },
   { id: "config", label: "模型配置", Icon: Settings },
   { id: "platforms", label: "消息渠道", Icon: MessageSquare },
   { id: "skills", label: "Skills", Icon: Puzzle },
   { id: "usage", label: "Token 统计", Icon: BarChart3 },
   { id: "diagnosis", label: "诊断修复", Icon: Stethoscope },
-  { id: "install", label: "环境安装", Icon: Download },
   { id: "about", label: "关于", Icon: Info },
+  { id: "install", label: "环境安装", Icon: Download, visible: false },
 ];
+
+const visibleNavItems = navItems.filter(item => item.visible !== false);
 
 interface SidebarProps {
   current: Page;
@@ -119,7 +121,7 @@ export function Sidebar({ current, onChange }: SidebarProps) {
           gap: 1,
         }}
       >
-        {navItems.map(({ id, label, Icon }) => {
+        {visibleNavItems.map(({ id, label, Icon }) => {
           const active = current === id;
           return (
             <button

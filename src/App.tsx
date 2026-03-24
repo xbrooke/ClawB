@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
 import { Sidebar, type Page } from "./components/Sidebar";
-import { TitleBar } from "./components/TitleBar";
 import { StatusPage } from "./pages/StatusPage";
 import { DiagnosisPage } from "./pages/DiagnosisPage";
 import { ConfigPage } from "./pages/ConfigPage";
@@ -41,8 +40,6 @@ export default function App() {
         background: "var(--window-bg)",
       }}
     >
-      <TitleBar />
-
       <div
         style={{
           display: "flex",
