@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { Loader, CheckCircle, XCircle, Cpu, Zap, Play, Square, RotateCw, Download } from "lucide-react";
+import { Loader, CheckCircle, XCircle, Cpu, Zap, Play, Square, RotateCw, Download, ExternalLink } from "lucide-react";
 import { AppButton } from "@/components/AppButton";
 import { platform } from "@/openclaw/platform";
 import { detectNode, detectOpenClaw } from "@/openclaw/detect";
 import { getGatewayStatus, startGateway, stopGateway, installGateway } from "@/openclaw/gateway";
-import { installOpenClaw } from "@/openclaw/install";
 
 interface NodeInfo {
   version: string;
@@ -25,11 +24,9 @@ export function InstallPage() {
   const [nodeStatus, setNodeStatus] = useState<"checking" | "installed" | "missing">("checking");
   const [nodeInfo, setNodeInfo] = useState<NodeInfo | null>(null);
   const [openclawStatus, setOpenclawStatus] = useState<"checking" | "installed" | "missing">("checking");
-  const [openclawInfo, setOpenclawInfo] = useState<OpenClawInfo | null>(null);
+  const [openclawInfo, setOpenClawnInfo] = useState<OpenClawInfo | null>(null);
   const [gatewayStatus, setGatewayStatus] = useState<GatewayInfo>({ running: false, pid: null });
   const [gatewayLoading, setGatewayLoading] = useState(false);
-  const [installing, setInstalling] = useState(false);
-  const [installProgress, setInstallProgress] = useState<string>("");
 
   useEffect(() => {
     checkStatus();
@@ -55,7 +52,7 @@ export function InstallPage() {
       const ocResult = await detectOpenClaw();
       if (ocResult.installed) {
         setOpenclawStatus("installed");
-        setOpenclawInfo({ version: ocResult.version ?? "unknown", path: ocResult.path ?? "" });
+        setOpenClawnInfo({ version: ocResult.version ?? "unknown", path: ocResult.path ?? "" });
         setGatewayStatus({ running: ocResult.gatewayRunning, pid: ocResult.gatewayPid });
       } else {
         setOpenclawStatus("missing");
@@ -69,24 +66,6 @@ export function InstallPage() {
       setGatewayStatus({ running: gs.running, pid: gs.pid });
     } catch {
       setGatewayStatus({ running: false, pid: null });
-    }
-  };
-
-  const handleInstall = async () => {
-    setInstalling(true);
-    setInstallProgress("正在初始化安装...");
-    try {
-      const result = await installOpenClaw();
-      if (result.success) {
-        setInstallProgress("安装完成");
-      } else {
-        setInstallProgress(`安装失败: ${result.error}`);
-      }
-    } catch (e) {
-      setInstallProgress(`安装失败: ${e}`);
-    } finally {
-      setInstalling(false);
-      await checkStatus();
     }
   };
 
@@ -138,6 +117,11 @@ export function InstallPage() {
         <span style={{ fontSize: 13, color: "var(--accent-red)" }}>{label}</span>
       </div>
     );
+  };
+
+  // Get download URL based on platform
+  const getDownloadUrl = () => {
+    return "https://github.com/qingchencloud/openclaw-standalone/releases/latest";
   };
 
   return (
@@ -219,28 +203,34 @@ export function InstallPage() {
       </div>
 
       <div>
-        <div className="section-title">一键安装</div>
+        <div className="section-title">下载 OpenClaw</div>
         <div className="glass-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            自动检测并安装 Node.js 和 OpenClaw，包括网关服务的安装和配置。
+            请下载并安装 OpenClaw 独立版本，内置运行时，解压即用。
           </div>
-          {installProgress && (
-            <div style={{ padding: "10px 14px", borderRadius: "var(--radius-md)", fontSize: 12, background: "var(--card-bg-hover)", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
-              {installProgress}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500, minWidth: 70 }}>Windows:</span>
+              <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>下载 .exe 安装向导，双击即装</span>
             </div>
-          )}
-          <AppButton onClick={handleInstall} disabled={installing} style={{ alignSelf: "flex-start" }}>
-            {installing ? (
-              <>
-                <Loader size={14} style={{ animation: "spin 1s linear infinite" }} />
-                安装中...
-              </>
-            ) : (
-              <>
-                <Download size={14} />
-                一键安装
-              </>
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500, minWidth: 70 }}>macOS:</span>
+              <code style={{ fontSize: 12, background: "var(--card-bg-hover)", padding: "4px 8px", borderRadius: "var(--radius-xs)", fontFamily: "var(--font-mono)" }}>
+                curl -fsSL https://dl.qrj.ai/openclaw/install.sh | bash
+              </code>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500, minWidth: 70 }}>Linux:</span>
+              <code style={{ fontSize: 12, background: "var(--card-bg-hover)", padding: "4px 8px", borderRadius: "var(--radius-xs)", fontFamily: "var(--font-mono)" }}>
+                curl -fsSL https://dl.qrj.ai/openclaw/install.sh | bash
+              </code>
+            </div>
+          </div>
+
+          <AppButton onClick={() => window.open(getDownloadUrl(), "_blank")} style={{ alignSelf: "flex-start" }}>
+            <ExternalLink size={14} />
+            下载地址
           </AppButton>
         </div>
       </div>

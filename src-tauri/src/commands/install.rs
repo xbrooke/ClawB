@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -7,6 +9,9 @@ use tokio::{fs, io::AsyncWriteExt};
 
 use crate::commands::config::{cleanup_feishu_plugin_install, prepare_stock_feishu_plugin};
 use crate::commands::runtime::{clean_openclaw_output, run_shell, run_shell_output, shell_escape, spawn_shell, with_shell_path, output_text};
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct InstallInfo {
@@ -703,6 +708,7 @@ pub async fn get_openclaw_info() -> Result<InstallInfo, String> {
 async fn get_openclaw_info_windows() -> Result<InstallInfo, String> {
     let output = Command::new("cmd")
         .args(["/C", "where openclaw 2>NUL"])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .await
         .map_err(|e| e.to_string())?;
@@ -715,6 +721,7 @@ async fn get_openclaw_info_windows() -> Result<InstallInfo, String> {
 
     let version_output = Command::new("cmd")
         .args(["/C", "openclaw --version 2>NUL"])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .await
         .map_err(|e| e.to_string())?;
@@ -759,6 +766,7 @@ pub async fn get_node_info() -> Result<Option<String>, String> {
     {
         let output = Command::new("cmd")
             .args(["/C", "node --version 2>NUL"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .await
             .map_err(|e| e.to_string())?;
@@ -788,6 +796,7 @@ pub async fn check_openclaw_version() -> Result<String, String> {
     {
         let output = Command::new("cmd")
             .args(["/C", "openclaw --version 2>NUL"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .await
             .map_err(|e| e.to_string())?;
@@ -807,6 +816,7 @@ pub async fn get_command_path(command: String) -> Result<Option<String>, String>
     {
         let output = Command::new("cmd")
             .args(["/C", &format!("where {} 2>NUL", command)])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .await
             .map_err(|e| e.to_string())?;

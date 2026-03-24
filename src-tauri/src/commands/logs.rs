@@ -910,6 +910,9 @@ pub async fn test_feishu_connection(app_id: String, app_secret: String) -> Resul
 #[cfg(target_os = "windows")]
 #[tauri::command]
 pub async fn install_weixin_plugin(window: tauri::Window) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
     let npx_cmd = get_npx_command();
     let full_cmd = format!(
         r#"{} && {} -y @tencent-weixin/openclaw-weixin-cli@latest install"#,
@@ -919,6 +922,7 @@ pub async fn install_weixin_plugin(window: tauri::Window) -> Result<(), String> 
 
     let mut child = tokio::process::Command::new("cmd")
         .args(["/C", &full_cmd])
+        .creation_flags(CREATE_NO_WINDOW)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
