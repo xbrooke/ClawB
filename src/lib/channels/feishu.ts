@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ConfigChannel, ChannelStatus, ChannelConfig } from "./types";
+import { ChannelError } from "./types";
 
 interface FeishuConfig extends ChannelConfig {
   feishu_app_id?: string;
@@ -72,7 +73,7 @@ export class FeishuChannel implements ConfigChannel {
 
   async send(_payload: { content: string; userId?: string }): Promise<void> {
     if (!this.config.feishu_app_id || !this.config.feishu_app_secret) {
-      throw new Error("飞书未配置");
+      throw new ChannelError("飞书未配置，请先配置App ID和App Secret后再发送消息", this.id, "NOT_READY");
     }
     // Messages go through the gateway
   }

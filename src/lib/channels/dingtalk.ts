@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ConfigChannel, ChannelStatus, ChannelConfig } from "./types";
+import { ChannelError } from "./types";
 
 interface DingTalkConfig extends ChannelConfig {
   webhook_url?: string;
@@ -70,7 +71,7 @@ export class DingTalkChannel implements ConfigChannel {
 
   async send(payload: { content: string; userId?: string }): Promise<void> {
     if (!this.config.webhook_url) {
-      throw new Error("钉钉未配置");
+      throw new ChannelError("钉钉未配置，请先配置Webhook URL后再发送消息", this.id, "NOT_READY");
     }
     await invoke("send_dingtalk_message", {
       webhookUrl: this.config.webhook_url,

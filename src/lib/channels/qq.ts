@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { BindChannel, ChannelStatus, BindStatus } from "./types";
+import { ChannelError } from "./types";
 
 export class QQChannel implements BindChannel {
   readonly id = "qq";
@@ -65,7 +66,7 @@ export class QQChannel implements BindChannel {
 
   async send(payload: { content: string; userId?: string }): Promise<void> {
     if (this.bindStatus !== "bound") {
-      throw new Error("QQ 未绑定");
+      throw new ChannelError("QQ未绑定，请先绑定后再发送消息", this.id, "NOT_READY");
     }
     await invoke("send_qq_message", {
       content: payload.content,

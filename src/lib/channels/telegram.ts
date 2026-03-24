@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ConfigChannel, ChannelStatus, ChannelConfig } from "./types";
+import { ChannelError } from "./types";
 
 interface TelegramConfig extends ChannelConfig {
   bot_token?: string;
@@ -69,7 +70,7 @@ export class TelegramChannel implements ConfigChannel {
 
   async send(payload: { content: string; userId?: string }): Promise<void> {
     if (!this.config.bot_token || !this.config.chat_id) {
-      throw new Error("Telegram 未配置");
+      throw new ChannelError("Telegram未配置，请先配置Bot Token和Chat ID后再发送消息", this.id, "NOT_READY");
     }
     await invoke("send_telegram_message", {
       botToken: this.config.bot_token,

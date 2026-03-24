@@ -41,3 +41,14 @@ export interface SendPayload {
   userId?: string;
   [key: string]: unknown;
 }
+
+export class ChannelError extends Error {
+  constructor(
+    message: string,
+    public channelId: string,
+    public code: "NOT_FOUND" | "NOT_READY" | "SEND_FAILED" | "VALIDATION_FAILED" = "SEND_FAILED"
+  ) {
+    super(message);
+    this.name = "ChannelError";
+  }
+}

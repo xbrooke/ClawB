@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { BindChannel, ChannelStatus, BindStatus, SendPayload } from "./types";
+import { ChannelError } from "./types";
 
 export class WeChatChannel implements BindChannel {
   readonly id = "weixin";
@@ -93,16 +94,17 @@ export class WeChatChannel implements BindChannel {
       this.status = "inactive";
     } catch {
       this.bindStatus = "error";
-      throw new Error("卸载失败");
+      throw new ChannelError("微信插件卸载失败", this.id, "SEND_FAILED");
     }
   }
 
   async send(payload: SendPayload): Promise<void> {
     if (this.bindStatus !== "bound") {
-      throw new Error("微信未绑定，无法发送消息");
+      throw new ChannelError("微信未绑定，请先绑定后再发送消息", this.id, "NOT_READY");
     }
     if (!payload.content) {
-      throw new Error("消息内容不能为空");
+      throw new ChannelError("消息内容不能为空", this.id, "VALIDATION_FAILED");
     }
+    // Actual send implementation - messages go through gateway
   }
 }
