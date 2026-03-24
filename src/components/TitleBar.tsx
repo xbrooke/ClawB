@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Minus, Square, X, MinusSquare } from "lucide-react";
+import { Minus, Square, X } from "lucide-react";
+import { useTheme } from "@/hooks/useTheme";
 
 declare global {
   interface Window {
@@ -9,6 +10,7 @@ declare global {
 
 export function TitleBar() {
   const [isMaximized, setIsMaximized] = useState(false);
+  const theme = useTheme();
 
   useEffect(() => {
     const checkMaximized = async () => {
@@ -50,6 +52,8 @@ export function TitleBar() {
     }
   };
 
+  const isDark = theme === "github-dark";
+
   return (
     <div
       data-tauri-drag-region
@@ -60,8 +64,8 @@ export function TitleBar() {
         justifyContent: "space-between",
         paddingLeft: 12,
         paddingRight: 4,
-        background: "var(--window-bg)",
-        borderBottom: "1px solid var(--sidebar-border)",
+        background: isDark ? "#0D1117" : "#FFFFFF",
+        borderBottom: `1px solid ${isDark ? "#21262D" : "#E5E7EB"}`,
         userSelect: "none",
         WebkitUserSelect: "none",
       }}
@@ -70,7 +74,7 @@ export function TitleBar() {
         style={{
           fontSize: 12,
           fontWeight: 500,
-          color: "var(--text-secondary)",
+          color: isDark ? "#8B949E" : "#6B7280",
         }}
       >
         ClawB
@@ -81,23 +85,18 @@ export function TitleBar() {
           onClick={handleMinimize}
           style={{
             width: 36,
-            height: 26,
+            height: 28,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: "var(--radius-xs)",
-            border: "none",
             background: "transparent",
+            border: "none",
+            borderRadius: 4,
             cursor: "pointer",
-            color: "var(--text-secondary)",
-            transition: "background 0.1s ease, color 0.1s ease",
+            color: isDark ? "#8B949E" : "#6B7280",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "var(--card-bg-hover)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = isDark ? "#21262D" : "#F3F4F6")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         >
           <Minus size={14} />
         </button>
@@ -105,49 +104,37 @@ export function TitleBar() {
           onClick={handleMaximize}
           style={{
             width: 36,
-            height: 26,
+            height: 28,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: "var(--radius-xs)",
-            border: "none",
             background: "transparent",
+            border: "none",
+            borderRadius: 4,
             cursor: "pointer",
-            color: "var(--text-secondary)",
-            transition: "background 0.1s ease, color 0.1s ease",
+            color: isDark ? "#8B949E" : "#6B7280",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "var(--card-bg-hover)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = isDark ? "#21262D" : "#F3F4F6")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         >
-          {isMaximized ? <MinusSquare size={14} /> : <Square size={12} />}
+          {isMaximized ? <Square size={12} /> : <Square size={12} />}
         </button>
         <button
           onClick={handleClose}
           style={{
             width: 36,
-            height: 26,
+            height: 28,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: "var(--radius-xs)",
-            border: "none",
             background: "transparent",
+            border: "none",
+            borderRadius: 4,
             cursor: "pointer",
-            color: "var(--text-secondary)",
-            transition: "background 0.1s ease, color 0.1s ease",
+            color: isDark ? "#8B949E" : "#6B7280",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "var(--accent-red)";
-            e.currentTarget.style.color = "white";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.color = "var(--text-secondary)";
-          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "#F85149")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         >
           <X size={14} />
         </button>
