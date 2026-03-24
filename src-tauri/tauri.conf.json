@@ -22,9 +22,7 @@
         "minimizable": true,
         "fullscreen": false,
         "transparent": false,
-        "center": true,
-        "decorations": false,
-        "backgroundColor": "#0F172A"
+        "center": true
       }
     ],
     "security": {

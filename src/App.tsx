@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Sidebar, type Page } from "./components/Sidebar";
+import { TitleBar } from "./components/TitleBar";
 import { StatusPage } from "./pages/StatusPage";
 import { DiagnosisPage } from "./pages/DiagnosisPage";
 import { ConfigPage } from "./pages/ConfigPage";
@@ -8,8 +9,10 @@ import { TokenUsagePage } from "./pages/TokenUsagePage";
 import { PlatformsPage } from "./pages/PlatformsPage";
 import { AboutPage } from "./pages/AboutPage";
 import { InstallPage } from "./pages/InstallPage";
+import { usePlatform } from "./hooks/usePlatform";
 
 export default function App() {
+  const { isWindows } = usePlatform();
   const [page, setPage] = useState<Page>("status");
   const [visitedPages, setVisitedPages] = useState<Page[]>(["status"]);
 
@@ -40,6 +43,8 @@ export default function App() {
         background: "var(--window-bg)",
       }}
     >
+      {isWindows && <TitleBar />}
+
       <div
         style={{
           display: "flex",

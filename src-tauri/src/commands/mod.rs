@@ -4,3 +4,4 @@ pub mod install;
 pub mod logs;
 pub mod runtime;
 pub mod skills;
+pub mod system;

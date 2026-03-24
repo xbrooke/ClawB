@@ -23,6 +23,7 @@ use commands::{
         test_feishu_connection, install_weixin_plugin,
     },
     skills::{get_installed_skills, install_skill, list_available_skills, uninstall_skill},
+    system::get_platform,
 };
 use tauri::Manager;
 
@@ -99,6 +100,7 @@ pub fn run() {
             run_token_treatment,
             test_feishu_connection,
             install_weixin_plugin,
+            get_platform,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
