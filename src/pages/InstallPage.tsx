@@ -1,260 +1,227 @@
-import { useEffect, useState } from "react";
-import { Loader, CheckCircle, XCircle, Cpu, Zap, Play, Square, RotateCw, Download, AlertCircle } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { CheckCircle, XCircle, Loader, Play, Square, Download, Terminal } from "lucide-react";
 import { AppButton } from "@/components/AppButton";
-import { detect, InstallState, type DetectionResult } from "@/openclaw/detect";
-import { installOpenClaw, onboardOpenClaw, startGateway, stopGateway, restartGateway, installGateway } from "@/openclaw/install";
+import { getServiceStatus, prepareEnvironment, startService, stopService, type ServiceStatus } from "@/openclaw";
 
 export function InstallPage() {
-  const [detecting, setDetecting] = useState(true);
-  const [result, setResult] = useState<DetectionResult | null>(null);
-  const [loading, setLoading] = useState<string | null>(null);
-  const [message, setMessage] = useState<string>("");
+  const [status, setStatus] = useState<ServiceStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [preparing, setPreparing] = useState(false);
+  const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // Detect on mount
   useEffect(() => {
     checkStatus();
   }, []);
 
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
+
   async function checkStatus() {
-    setDetecting(true);
+    setLoading(true);
     try {
-      const status = await detect();
-      setResult(status);
-    } catch (e) {
-      setMessage(`检测失败: ${e}`);
+      const s = await getServiceStatus();
+      setStatus(s);
+    } finally {
+      setLoading(false);
     }
-    setDetecting(false);
   }
 
-  async function handleInstall() {
-    setLoading("install");
-    setMessage("正在安装 OpenClaw...");
-    const res = await installOpenClaw();
-    if (res.success) {
-      setMessage("安装完成");
+  function addLog(msg: string) {
+    setLogs((prev) => [...prev, msg]);
+  }
+
+  async function handlePrepare() {
+    setPreparing(true);
+    setLogs([]);
+    addLog("开始准备环境...");
+
+    const result = await prepareEnvironment((log) => addLog(log));
+
+    if (result.success) {
+      addLog("✅ " + result.message);
     } else {
-      setMessage(`安装失败: ${res.error}`);
+      addLog("❌ " + result.message);
     }
-    setLoading(null);
+
+    setPreparing(false);
     await checkStatus();
   }
 
-  async function handleOnboard() {
-    setLoading("onboard");
-    setMessage("正在初始化 OpenClaw...");
-    const res = await onboardOpenClaw();
+  async function handleStart() {
+    setActionLoading("start");
+    addLog("正在启动 Gateway...");
+    const res = await startService();
     if (res.success) {
-      setMessage("初始化完成");
+      addLog("✅ Gateway 启动成功");
     } else {
-      setMessage(`初始化失败: ${res.error}`);
+      addLog("❌ 启动失败: " + res.message);
     }
-    setLoading(null);
+    setActionLoading(null);
     await checkStatus();
   }
 
-  async function handleStartGateway() {
-    setLoading("start");
-    setMessage("正在启动 Gateway...");
-    // First try to install gateway service
-    await installGateway();
-    const res = await startGateway();
+  async function handleStop() {
+    setActionLoading("stop");
+    addLog("正在停止 Gateway...");
+    const res = await stopService();
     if (res.success) {
-      setMessage("Gateway 启动成功");
+      addLog("✅ Gateway 已停止");
     } else {
-      setMessage(`启动失败: ${res.error}`);
+      addLog("❌ 停止失败: " + res.message);
     }
-    setLoading(null);
+    setActionLoading(null);
     await checkStatus();
   }
 
-  async function handleStopGateway() {
-    setLoading("stop");
-    setMessage("正在停止 Gateway...");
-    const res = await stopGateway();
-    if (res.success) {
-      setMessage("Gateway 已停止");
-    } else {
-      setMessage(`停止失败: ${res.error}`);
-    }
-    setLoading(null);
-    await checkStatus();
+  if (loading) {
+    return (
+      <div className="page-container">
+        <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>
+          <Loader size={24} className="spin" style={{ marginBottom: 8 }} />
+          <div>加载中...</div>
+        </div>
+      </div>
+    );
   }
 
-  async function handleRestartGateway() {
-    setLoading("restart");
-    setMessage("正在重启 Gateway...");
-    const res = await restartGateway();
-    if (res.success) {
-      setMessage("Gateway 重启成功");
-    } else {
-      setMessage(`重启失败: ${res.error}`);
-    }
-    setLoading(null);
-    await checkStatus();
-  }
 
-  function getStatusIcon(condition: boolean) {
-    if (condition) {
-      return <CheckCircle size={16} style={{ color: "var(--accent-green)" }} />;
-    }
-    return <XCircle size={16} style={{ color: "var(--accent-red)" }} />;
-  }
 
-  function isLoading(action: string) {
-    return loading === action;
+  function getMainButton() {
+    if (!status) return null;
+
+    if (preparing) {
+      return (
+        <AppButton onClick={() => {}} disabled size="md">
+          <Loader size={16} className="spin" /> 准备中...
+        </AppButton>
+      );
+    }
+
+    switch (status.state) {
+      case "NOT_READY":
+        return (
+          <AppButton onClick={handlePrepare} size="md">
+            <Download size={16} /> 一键安装
+          </AppButton>
+        );
+      case "READY":
+        return (
+          <AppButton onClick={handleStart} disabled={actionLoading === "start"} size="md">
+            {actionLoading === "start" ? <Loader size={16} className="spin" /> : <Play size={16} />}
+            启动服务
+          </AppButton>
+        );
+      case "RUNNING":
+        return (
+          <AppButton onClick={handleStop} disabled={actionLoading === "stop"} size="md" tone="secondary">
+            {actionLoading === "stop" ? <Loader size={16} className="spin" /> : <Square size={16} />}
+            停止服务
+          </AppButton>
+        );
+    }
   }
 
   return (
-    <div className="page-container" style={{ maxWidth: 600 }}>
-      <div>
+    <div className="page-container" style={{ maxWidth: 720 }}>
+      <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 4px 0" }}>
           环境安装
         </h1>
         <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
-          {detecting ? "检测中..." : `状态: ${result?.state || "未知"}`}
+          {status?.state === "RUNNING"
+            ? "服务运行中，可停止后重新安装"
+            : status?.state === "READY"
+              ? "环境就绪，可以启动服务"
+              : "点击一键安装 OpenClaw 环境"}
         </p>
       </div>
 
       {/* Status Cards */}
-      <div>
-        <div className="section-title">环境状态</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div className="glass-card" style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Cpu size={18} style={{ color: "var(--accent-blue)" }} />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Node.js</div>
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                  {result?.node.version ? `v${result.node.version}` : "未安装"}
-                </div>
-              </div>
-            </div>
-            {getStatusIcon(result?.node.exists || false)}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+        <div className="glass-card" style={{ padding: "16px", textAlign: "center" }}>
+          <div style={{ fontSize: 24, marginBottom: 4 }}>
+            {status?.nodeInstalled ? (
+              <CheckCircle size={24} style={{ color: "var(--accent-green)" }} />
+            ) : (
+              <XCircle size={24} style={{ color: "var(--accent-red)" }} />
+            )}
           </div>
-
-          <div className="glass-card" style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Zap size={18} style={{ color: "var(--accent-purple)" }} />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>OpenClaw</div>
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                  {result?.openclaw.version ? `v${result.openclaw.version}` : "未安装"}
-                </div>
-              </div>
-            </div>
-            {getStatusIcon(result?.openclaw.exists || false)}
+          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Node.js</div>
+          <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+            {status?.nodeVersion ? `v${status.nodeVersion}` : "未安装"}
           </div>
+        </div>
 
-          <div className="glass-card" style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div className={`status-dot ${result?.gateway.running ? "running" : "stopped"}`} style={{ margin: 0 }} />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Gateway</div>
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                  {result?.gateway.running ? `运行中 (PID: ${result.gateway.pid})` : "未运行"}
-                </div>
-              </div>
-            </div>
-            {getStatusIcon(result?.gateway.running || false)}
+        <div className="glass-card" style={{ padding: "16px", textAlign: "center" }}>
+          <div style={{ fontSize: 24, marginBottom: 4 }}>
+            {status?.openclawInstalled ? (
+              <CheckCircle size={24} style={{ color: "var(--accent-green)" }} />
+            ) : (
+              <XCircle size={24} style={{ color: "var(--accent-red)" }} />
+            )}
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>OpenClaw</div>
+          <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+            {status?.openclawVersion ? `v${status.openclawVersion}` : "未安装"}
+          </div>
+        </div>
+
+        <div className="glass-card" style={{ padding: "16px", textAlign: "center" }}>
+          <div style={{ fontSize: 24, marginBottom: 4 }}>
+            {status?.gatewayRunning ? (
+              <CheckCircle size={24} style={{ color: "var(--accent-green)" }} />
+            ) : (
+              <XCircle size={24} style={{ color: "var(--text-tertiary)" }} />
+            )}
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Gateway</div>
+          <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+            {status?.gatewayRunning ? "运行中" : "已停止"}
           </div>
         </div>
       </div>
 
-      {/* Issues */}
-      {result && result.state !== InstallState.READY && (
-        <div>
-          <div className="section-title">待处理</div>
-          <div className="glass-card" style={{ padding: 16, display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <AlertCircle size={16} style={{ color: "var(--accent-orange)", marginTop: 2 }} />
-            <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-              {!result.node.exists && <div>• Node.js 未安装</div>}
-              {!result.openclaw.exists && <div>• OpenClaw 未安装</div>}
-              {result.openclaw.exists && !result.gateway.running && <div>• Gateway 未运行</div>}
-            </div>
+      {/* Main Action */}
+      <div style={{ marginBottom: 24 }}>{getMainButton()}</div>
+
+      {/* Logs */}
+      {logs.length > 0 && (
+        <div className="glass-card" style={{ padding: 0, overflow: "hidden" }}>
+          <div
+            style={{
+              padding: "10px 14px",
+              borderBottom: "1px solid var(--card-border)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <Terminal size={14} style={{ color: "var(--text-secondary)" }} />
+            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)" }}>日志</span>
+          </div>
+          <div
+            style={{
+              padding: 12,
+              fontFamily: "monospace",
+              fontSize: 12,
+              lineHeight: 1.6,
+              maxHeight: 240,
+              overflowY: "auto",
+              background: "var(--window-bg)",
+            }}
+          >
+            {logs.map((log, i) => (
+              <div key={i} style={{ color: "var(--text-secondary)" }}>
+                {log}
+              </div>
+            ))}
+            <div ref={logsEndRef} />
           </div>
         </div>
       )}
-
-      {/* Actions */}
-      <div>
-        <div className="section-title">操作</div>
-        <div className="glass-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
-          {message && (
-            <div style={{
-              padding: "10px 14px",
-              borderRadius: "var(--radius-md)",
-              fontSize: 13,
-              background: message.includes("失败") ? "var(--accent-red)" : "var(--card-bg-hover)",
-              color: message.includes("失败") ? "white" : "var(--text-secondary)",
-              fontFamily: "var(--font-mono)",
-            }}>
-              {message}
-            </div>
-          )}
-
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            {/* Install button - show when OpenClaw not installed */}
-            {!result?.openclaw.exists && (
-              <AppButton onClick={handleInstall} disabled={loading !== null}>
-                {isLoading("install") ? <Loader size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Download size={14} />}
-                安装 OpenClaw
-              </AppButton>
-            )}
-
-            {/* Onboard button - show when OpenClaw installed but gateway not running */}
-            {result?.openclaw.exists && !result?.gateway.running && (
-              <>
-                <AppButton onClick={handleOnboard} disabled={loading !== null}>
-                  {isLoading("onboard") ? <Loader size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={14} />}
-                  初始化
-                </AppButton>
-                <AppButton onClick={handleStartGateway} disabled={loading !== null}>
-                  {isLoading("start") ? <Loader size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Play size={14} />}
-                  启动 Gateway
-                </AppButton>
-              </>
-            )}
-
-            {/* Gateway controls - show when ready */}
-            {result?.gateway.running && (
-              <>
-                <AppButton tone="secondary" onClick={handleRestartGateway} disabled={loading !== null}>
-                  {isLoading("restart") ? <Loader size={14} style={{ animation: "spin 1s linear infinite" }} /> : <RotateCw size={14} />}
-                  重启
-                </AppButton>
-                <AppButton tone="redSubtle" onClick={handleStopGateway} disabled={loading !== null}>
-                  {isLoading("stop") ? <Loader size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Square size={14} />}
-                  停止
-                </AppButton>
-              </>
-            )}
-
-            {/* Refresh */}
-            <AppButton tone="secondary" onClick={checkStatus} disabled={loading !== null}>
-              <Loader size={14} />
-              刷新
-            </AppButton>
-          </div>
-        </div>
-      </div>
-
-      {/* Help */}
-      <div>
-        <div className="section-title">说明</div>
-        <div className="glass-card" style={{ padding: 16 }}>
-          <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            {result?.state === InstallState.READY
-              ? "✓ 环境就绪，Gateway 运行中"
-              : result?.state === InstallState.INSTALLED
-                ? "OpenClaw 已安装，点击「初始化」然后「启动 Gateway」"
-                : "点击「安装 OpenClaw」开始安装"}
-          </div>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   );
 }

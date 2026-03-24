@@ -1,445 +1,202 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  CheckCircle2,
-  Circle,
-  ArrowRightCircle,
-} from "lucide-react";
+import { CheckCircle2, Circle, ArrowRightCircle, Cpu, Zap, Server, Play, Square, RotateCw } from "lucide-react";
 import { AppButton } from "@/components/AppButton";
-import {
-  getGatewayStatus,
-  checkOpenclawInstalled,
-  readConfig,
-  readModelAuthStatus,
-  getWeixinPluginStatus,
-  type GatewayStatus,
-  type InstallInfo,
-  type ModelAuthStatus,
-  type OpenClawConfig,
-} from "@/lib/tauri";
+import { getServiceStatus, startService, stopService, restartService, type ServiceStatus, type AppState } from "@/openclaw";
 import type { Page } from "@/components/Sidebar";
 
 interface StatusPageProps {
   onNavigate: (page: Page) => void;
 }
 
-interface StatusPageCache {
-  status: GatewayStatus | null;
-  info: InstallInfo | null;
-  config: OpenClawConfig;
-  modelAuth: ModelAuthStatus | null;
-}
-
-let statusPageCache: StatusPageCache | null = null;
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function StatusBadge({ state }: { state: AppState }) {
+  const config: Record<AppState, { color: string; bg: string; label: string }> = {
+    NOT_READY: { color: "var(--accent-red)", bg: "rgba(239, 68, 68, 0.1)", label: "未就绪" },
+    READY: { color: "var(--accent-yellow)", bg: "rgba(234, 179, 8, 0.1)", label: "已就绪" },
+    RUNNING: { color: "var(--accent-green)", bg: "rgba(34, 197, 94, 0.1)", label: "运行中" },
+  };
+  const { color, bg, label } = config[state];
   return (
-    <div
-      style={{
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: "0.05em",
-        textTransform: "uppercase",
-        color: "var(--text-tertiary)",
-      }}
-    >
-      {children}
-    </div>
+    <span style={{ padding: "4px 10px", borderRadius: 12, fontSize: 12, fontWeight: 500, color, background: bg }}>
+      {label}
+    </span>
   );
 }
 
-function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)", marginBottom: 4 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 14, color: "var(--text-primary)" }}>{children}</div>
-    </div>
-  );
-}
-
-function hasText(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-type FlowState = "done" | "current" | "pending";
-
-interface FlowStep {
-  key: string;
-  title: string;
-  detail: string;
-  state: FlowState;
-}
-
-function FlowStepRow({ step, bordered = true }: { step: FlowStep; bordered?: boolean }) {
-  const tone =
-    step.state === "done"
-      ? "var(--accent-green)"
-      : step.state === "current"
-        ? "var(--accent-blue)"
-        : "var(--text-tertiary)";
-
-  const Icon =
-    step.state === "done"
-      ? CheckCircle2
-      : step.state === "current"
-        ? ArrowRightCircle
-        : Circle;
+function ServiceCard({ status }: { status: ServiceStatus }) {
+  const cards = [
+    {
+      icon: Cpu,
+      label: "Node.js",
+      value: status.nodeVersion ? `v${status.nodeVersion}` : "未安装",
+      ok: status.nodeInstalled,
+    },
+    {
+      icon: Zap,
+      label: "OpenClaw CLI",
+      value: status.openclawVersion ? `v${status.openclawVersion}` : "未安装",
+      ok: status.openclawInstalled,
+    },
+    {
+      icon: Server,
+      label: "Gateway",
+      value: status.gatewayRunning ? `PID ${status.gatewayPid}` : "已停止",
+      ok: status.gatewayRunning,
+    },
+  ];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 16,
-        padding: "10px 0",
-        borderBottom: bordered ? "1px solid var(--card-border)" : "none",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <Icon size={16} style={{ color: tone, marginTop: 2, flexShrink: 0 }} />
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{step.title}</div>
-          <div style={{ fontSize: 12, marginTop: 4, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-            {step.detail}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {cards.map((card) => (
+        <div
+          key={card.label}
+          className="glass-card"
+          style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <card.icon size={18} style={{ color: card.ok ? "var(--accent-green)" : "var(--text-tertiary)" }} />
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{card.label}</div>
+              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{card.value}</div>
+            </div>
           </div>
+          {card.ok ? (
+            <CheckCircle2 size={16} style={{ color: "var(--accent-green)" }} />
+          ) : (
+            <Circle size={16} style={{ color: "var(--text-tertiary)" }} />
+          )}
         </div>
-      </div>
-      <div style={{ fontSize: 12, fontWeight: 600, color: tone, whiteSpace: "nowrap" }}>
-        {step.state === "done" ? "已完成" : step.state === "current" ? "进行中" : "待完成"}
-      </div>
+      ))}
     </div>
+  );
+}
+
+function FlowStep({ label, state }: { label: string; state: "done" | "current" | "pending" }) {
+  const colors = { done: "var(--accent-green)", current: "var(--accent-blue)", pending: "var(--text-tertiary)" };
+  const Icon = state === "done" ? CheckCircle2 : state === "current" ? ArrowRightCircle : Circle;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <Icon size={14} style={{ color: colors[state] }} />
+      <span style={{ fontSize: 13, color: colors[state] }}>{label}</span>
+    </div>
+  );
+}
+
+function ServiceControls({ status, onRefresh, onNavigate }: { status: ServiceStatus; onRefresh: () => void; onNavigate: (page: Page) => void }) {
+  const [loading, setLoading] = useState<string | null>(null);
+
+  async function handleStart() {
+    setLoading("start");
+    await startService();
+    onRefresh();
+    setLoading(null);
+  }
+
+  async function handleStop() {
+    setLoading("stop");
+    await stopService();
+    onRefresh();
+    setLoading(null);
+  }
+
+  async function handleRestart() {
+    setLoading("restart");
+    await restartService();
+    onRefresh();
+    setLoading(null);
+  }
+
+  if (status.state === "RUNNING") {
+    return (
+      <div style={{ display: "flex", gap: 8 }}>
+        <AppButton onClick={handleRestart} disabled={!!loading} size="sm">
+          <RotateCw size={14} /> 重启
+        </AppButton>
+        <AppButton onClick={handleStop} disabled={!!loading} tone="secondary" size="sm">
+          <Square size={14} /> 停止
+        </AppButton>
+      </div>
+    );
+  }
+
+  if (status.state === "READY") {
+    return (
+      <AppButton onClick={handleStart} disabled={!!loading} size="sm">
+        <Play size={14} /> 启动服务
+      </AppButton>
+    );
+  }
+
+  return (
+    <AppButton onClick={() => onNavigate("install")} size="sm">
+      去安装
+    </AppButton>
   );
 }
 
 export function StatusPage({ onNavigate }: StatusPageProps) {
-  const [status, setStatus] = useState<GatewayStatus | null>(() => statusPageCache?.status ?? null);
-  const [info, setInfo] = useState<InstallInfo | null>(() => statusPageCache?.info ?? null);
-  const [config, setConfig] = useState<OpenClawConfig>(() => statusPageCache?.config ?? {});
-  const [modelAuth, setModelAuth] = useState<ModelAuthStatus | null>(() => statusPageCache?.modelAuth ?? null);
-  const [weixinPluginStatus, setWeixinPluginStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [initialized, setInitialized] = useState(Boolean(statusPageCache));
+  const [status, setStatus] = useState<ServiceStatus | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(async () => {
-    const [gatewayResult, installResult, configResult, modelAuthResult, weixinResult] = await Promise.allSettled([
-      getGatewayStatus(),
-      checkOpenclawInstalled(),
-      readConfig(),
-      readModelAuthStatus(),
-      getWeixinPluginStatus(),
-    ]);
-
-    const installInfo =
-      installResult.status === "fulfilled"
-        ? installResult.value
-        : { installed: false, version: null, path: null };
-
-    const gatewayStatus =
-      gatewayResult.status === "fulfilled"
-        ? gatewayResult.value
-        : { running: false, pid: null, message: "Gateway not running" };
-
-    const currentConfig = configResult.status === "fulfilled" ? configResult.value : {};
-    const nextModelAuth = modelAuthResult.status === "fulfilled" ? modelAuthResult.value : null;
-    const weixinStatus = weixinResult.status === "fulfilled" ? weixinResult.value : null;
-
-    setStatus(gatewayStatus);
-    setInfo(installInfo);
-    setConfig(currentConfig);
-    setModelAuth(nextModelAuth);
-    setWeixinPluginStatus(weixinStatus);
-    statusPageCache = {
-      status: gatewayStatus,
-      info: installInfo,
-      config: currentConfig,
-      modelAuth: nextModelAuth,
-    };
-    setInitialized(true);
-
-    const firstError = [gatewayResult, installResult, configResult, modelAuthResult].find(
-      (result) => result.status === "rejected"
-    );
-    setError(firstError?.status === "rejected" ? String(firstError.reason) : null);
+  const fetchStatus = useCallback(async () => {
+    setLoading(true);
+    try {
+      const s = await getServiceStatus();
+      setStatus(s);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    refresh();
-    const timer = setInterval(refresh, 10000);
-    return () => clearInterval(timer);
-  }, [refresh]);
+    fetchStatus();
+  }, [fetchStatus]);
 
-  const isInstalled = info?.installed ?? false;
-  const isRunning = status?.running ?? false;
-  const modelConfigured = Boolean(modelAuth?.has_any_auth) || (hasText(config.provider) && hasText(config.api_key));
-  const feishuConfigured = hasText(config.feishu_app_id) && hasText(config.feishu_app_secret);
-  const weixinConfigured = weixinPluginStatus === "enabled" || weixinPluginStatus === "running";
-  const platformConfigured = feishuConfigured || weixinConfigured;
-  const platformName = weixinConfigured ? "微信" : "飞书";
-  const gatewayReady = isInstalled && modelConfigured && platformConfigured;
-  const currentModel = modelAuth?.resolved_default ?? modelAuth?.default_model ?? null;
-  const steps: FlowStep[] = [
-    {
-      key: "install",
-      title: "安装 openclaw",
-      detail: isInstalled ? "CLI 已安装并可被 ClawB 检测到。" : "先完成 CLI 安装，后续配置和网关才能工作。",
-      state: isInstalled ? "done" : "current",
-    },
-    {
-      key: "model",
-      title: "连接模型",
-      detail: modelConfigured
-        ? currentModel
-          ? `当前默认模型：${currentModel}`
-          : "模型接入已就绪。"
-        : "去模型接入页配置 API Key 或 OAuth。",
-      state: modelConfigured ? "done" : isInstalled ? "current" : "pending",
-    },
-    {
-      key: "platform",
-      title: "配置消息渠道",
-      detail: platformConfigured ? `${platformName} 已配置完成。` : "去消息渠道页配置插件。",
-      state: platformConfigured ? "done" : isInstalled && modelConfigured ? "current" : "pending",
-    },
-    {
-      key: "gateway",
-      title: "启动网关",
-      detail: isRunning ? `网关正在运行，${platformName}消息可以转发到 openclaw。` : `启动后${platformName}机器人才能真正在线工作。`,
-      state: isRunning ? "done" : gatewayReady ? "current" : "pending",
-    },
-  ];
-
-  let nextStepTitle = "下一步";
-  let nextStepDescription = "按顺序完成";
-  let nextStepAction: React.ReactNode = null;
-
-  if (!isInstalled) {
-    nextStepTitle = "下一步：安装 openclaw";
-    nextStepDescription = "去环境安装页完成安装";
-    nextStepAction = <AppButton onClick={() => onNavigate("install")}>去环境安装</AppButton>;
-  } else if (!modelConfigured) {
-    nextStepTitle = "下一步：连接模型";
-    nextStepDescription = "去接入模型";
-    nextStepAction = <AppButton onClick={() => onNavigate("config")}>去模型接入</AppButton>;
-  } else if (!platformConfigured) {
-    nextStepTitle = "下一步：配置消息渠道";
-    nextStepDescription = "去填微信或飞书";
-    nextStepAction = <AppButton onClick={() => onNavigate("platforms")}>去配置</AppButton>;
-  } else if (!isRunning) {
-    nextStepTitle = "下一步：启动网关";
-    nextStepDescription = "去环境安装页启动";
-    nextStepAction = <AppButton onClick={() => onNavigate("install")}>去环境安装</AppButton>;
-  }
-
-  if (!initialized) {
+  if (loading || !status) {
     return (
-      <div
-        style={{
-          padding: "48px 40px 60px",
-          maxWidth: 680,
-          width: "100%",
-          margin: "0 auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: 32,
-        }}
-      >
-        <h1
-          style={{
-            fontSize: 22,
-            fontWeight: 600,
-            color: "var(--text-primary)",
-            letterSpacing: "-0.01em",
-            margin: 0,
-          }}
-        >
-          运行状态
-        </h1>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <SectionLabel>同步中</SectionLabel>
-          <div className="glass-card" style={{ padding: "18px 20px" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>正在读取本机状态…</div>
-            <div style={{ fontSize: 13, marginTop: 6, lineHeight: 1.6, color: "var(--text-secondary)" }}>
-              正在同步状态
-            </div>
-          </div>
-        </div>
+      <div className="page-container">
+        <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>加载中...</div>
       </div>
     );
   }
 
+  const flowSteps = [
+    { label: "Node.js", state: status.nodeInstalled ? "done" as const : "pending" as const },
+    { label: "OpenClaw CLI", state: status.openclawInstalled ? "done" as const : "pending" as const },
+    { label: "Gateway", state: status.gatewayRunning ? "done" as const : status.openclawInstalled ? "current" as const : "pending" as const },
+  ];
+
   return (
-    <div
-      style={{
-        padding: "48px 48px 60px",
-        maxWidth: 680,
-        width: "100%",
-        margin: "0 auto",
-        display: "flex",
-        flexDirection: "column",
-        gap: 24,
-      }}
-    >
-      <h1
-        style={{
-          fontSize: 22,
-          fontWeight: 600,
-          color: "var(--text-primary)",
-          letterSpacing: "-0.01em",
-          margin: 0,
-        }}
-      >
-        运行状态
-      </h1>
+    <div className="page-container">
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <h1 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>仪表盘</h1>
+          <StatusBadge state={status.state} />
+        </div>
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
+          {status.state === "RUNNING" ? "所有服务运行正常" : status.state === "READY" ? "请启动服务" : "请完成环境安装"}
+        </p>
+      </div>
 
-      {info && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <SectionLabel>安装状态</SectionLabel>
-          <div
-            className="glass-card"
-            style={{
-              padding: "18px 20px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 18,
-            }}
-          >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isInstalled ? "minmax(0, 1fr) minmax(0, 1fr) auto" : "minmax(0, 1fr) minmax(0, 1fr)",
-                columnGap: 24,
-                rowGap: 12,
-                alignItems: "start",
-              }}
-            >
-              <InfoRow label="状态">
-                <span style={{ fontWeight: 600, color: isInstalled ? "var(--accent-green)" : "var(--accent-red)" }}>
-                  {isInstalled ? "已安装" : "未找到"}
-                </span>
-              </InfoRow>
-              <InfoRow label="版本">
-                {info.version ? (
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>{info.version}</span>
-                ) : (
-                  <span style={{ color: "var(--text-tertiary)" }}>—</span>
-                )}
-              </InfoRow>
-
-            </div>
-
-            {info.path && (
-              <div>
-                <InfoRow label="路径">
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 11,
-                      wordBreak: "break-all",
-                      color: "var(--text-secondary)",
-                    }}
-                  >
-                    {info.path}
-                  </span>
-                </InfoRow>
-              </div>
+      <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
+        {flowSteps.map((step, i) => (
+          <div key={step.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <FlowStep label={step.label} state={step.state} />
+            {i < flowSteps.length - 1 && (
+              <span style={{ color: "var(--text-tertiary)", marginLeft: 8 }}>→</span>
             )}
           </div>
-        </div>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <SectionLabel>当前进度</SectionLabel>
-        <div className="glass-card" style={{ padding: "4px 20px" }}>
-          {steps.map((step, index) => (
-            <FlowStepRow key={step.key} step={step} bordered={index !== steps.length - 1} />
-          ))}
-        </div>
+        ))}
       </div>
 
-      {!isRunning && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <SectionLabel>下一步</SectionLabel>
-          <div className="glass-card" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{nextStepTitle}</div>
-              <div style={{ fontSize: 13, marginTop: 6, lineHeight: 1.6, color: "var(--text-secondary)" }}>
-                {nextStepDescription}
-              </div>
-            </div>
-            {nextStepAction}
-          </div>
-        </div>
-      )}
+      <div className="section-title">服务状态</div>
+      <ServiceCard status={status} />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <SectionLabel>网关</SectionLabel>
-        <div
-          className="glass-card"
-          style={{
-            padding: "16px 20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 14,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span className={`status-dot ${isRunning ? "running" : "stopped"}`} />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-                  {isRunning ? "运行中" : "已停止"}
-                </div>
-                {status?.pid && isRunning && (
-                  <div style={{ fontSize: 12, marginTop: 4, color: "var(--text-tertiary)" }}>PID {status.pid}</div>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 8 }}>
-              <AppButton onClick={() => onNavigate("install")} size="sm">
-                去环境安装页管理网关
-              </AppButton>
-            </div>
-          </div>
-
-          <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--text-secondary)" }}>
-            飞书机器人在线需要网关
-          </div>
-
-          {!gatewayReady && !isRunning && (
-            <div
-              style={{
-                padding: "10px 12px",
-                borderRadius: 8,
-                background: "rgba(255, 149, 0, 0.10)",
-                color: "var(--accent-orange)",
-                fontSize: 12,
-                border: "1px solid rgba(255, 149, 0, 0.18)",
-              }}
-            >
-              先完成安装、模型接入和飞书
-            </div>
-          )}
-        </div>
+      <div style={{ marginTop: 24, display: "flex", gap: 8 }}>
+        <ServiceControls status={status} onRefresh={fetchStatus} onNavigate={onNavigate} />
+        <AppButton onClick={fetchStatus} tone="secondary" size="sm">
+          刷新
+        </AppButton>
       </div>
-
-      {error && (
-        <div
-          style={{
-            padding: "12px 16px",
-            borderRadius: 8,
-            fontSize: 13,
-            background: "rgba(255, 59, 48, 0.1)",
-            color: "var(--accent-red)",
-            border: "1px solid rgba(255, 59, 48, 0.2)",
-          }}
-        >
-          {error}
-        </div>
-      )}
     </div>
   );
 }
