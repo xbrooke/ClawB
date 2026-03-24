@@ -908,6 +908,7 @@ pub async fn test_feishu_connection(app_id: String, app_secret: String) -> Resul
 }
 
 #[cfg(target_os = "windows")]
+#[tauri::command]
 pub async fn install_weixin_plugin(window: tauri::Window) -> Result<(), String> {
     let npx_cmd = get_npx_command();
     let full_cmd = format!(
@@ -941,6 +942,7 @@ pub async fn install_weixin_plugin(window: tauri::Window) -> Result<(), String> 
 }
 
 #[cfg(not(target_os = "windows"))]
+#[tauri::command]
 pub async fn install_weixin_plugin(window: tauri::Window) -> Result<(), String> {
     let mut child = tokio::process::Command::new("npx")
         .args(["-y", "@tencent-weixin/openclaw-weixin-cli@latest", "install"])

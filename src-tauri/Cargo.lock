@@ -444,6 +444,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "clawb"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dirs 5.0.1",
+ "regex",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-fs",
+ "tauri-plugin-opener",
+ "tauri-plugin-shell",
+ "tokio",
+ "which",
+ "window-vibrancy 0.7.1",
+]
+
+[[package]]
 name = "combine"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3100,26 +3120,6 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "runclaw"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dirs 5.0.1",
- "regex",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-fs",
- "tauri-plugin-opener",
- "tauri-plugin-shell",
- "tokio",
- "which",
- "window-vibrancy 0.7.1",
 ]
 
 [[package]]

@@ -6,7 +6,7 @@ use tokio::process::Command;
 use tokio::{fs, io::AsyncWriteExt};
 
 use crate::commands::config::{cleanup_feishu_plugin_install, prepare_stock_feishu_plugin};
-use crate::commands::runtime::{clean_openclaw_output, run_shell, shell_escape, spawn_shell, with_shell_path};
+use crate::commands::runtime::{clean_openclaw_output, run_shell, run_shell_output, shell_escape, spawn_shell, with_shell_path, output_text};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct InstallInfo {
