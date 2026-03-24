@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { platform } from "./platform";
+import { getOpenClawHome, getOpenClawConfigPath, getGatewayLogPath } from "./platform";
 
 export interface OpenClawStatus {
   installed: boolean;
@@ -67,20 +67,5 @@ export async function checkGatewayRunning(): Promise<boolean> {
   }
 }
 
-export function getOpenClawHome(): string {
-  if (platform.isWindows) {
-    return `${platform.homeDir}\\.openclaw`;
-  }
-  return `${platform.homeDir}/.openclaw`;
-}
-
-export function getOpenClawConfigPath(): string {
-  return `${getOpenClawHome()}/config.json`;
-}
-
-export function getGatewayLogPath(): string {
-  if (platform.isWindows) {
-    return `${platform.homeDir}\\.openclaw\\logs\\gateway.log`;
-  }
-  return `${platform.homeDir}/.openclaw/logs/gateway.log`;
-}
+// Re-export path utilities from platform module for backwards compatibility
+export { getOpenClawHome, getOpenClawConfigPath, getGatewayLogPath };
