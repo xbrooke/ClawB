@@ -2,29 +2,23 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Play,
   Square,
-  Download,
-  Trash2,
   CheckCircle2,
   Circle,
   ArrowRightCircle,
 } from "lucide-react";
 import { AppButton } from "@/components/AppButton";
-import { TerminalOverlay } from "@/components/TerminalOverlay";
 import {
   getGatewayStatus,
   checkOpenclawInstalled,
-  installOpenclaw,
   readConfig,
   readModelAuthStatus,
   startGateway,
   stopGateway,
-  uninstallOpenclaw,
   getWeixinPluginStatus,
   type GatewayStatus,
   type InstallInfo,
   type ModelAuthStatus,
   type OpenClawConfig,
-  updateOpenclaw,
 } from "@/lib/tauri";
 import type { Page } from "@/components/Sidebar";
 
@@ -132,15 +126,6 @@ export function StatusPage({ onNavigate }: StatusPageProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(Boolean(statusPageCache));
-  const [installing, setInstalling] = useState(false);
-  const [installLines, setInstallLines] = useState<string[]>([]);
-  const [installDone, setInstallDone] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [updateLines, setUpdateLines] = useState<string[]>([]);
-  const [updateDone, setUpdateDone] = useState(false);
-  const [uninstalling, setUninstalling] = useState(false);
-  const [uninstallLines, setUninstallLines] = useState<string[]>([]);
-  const [uninstallDone, setUninstallDone] = useState(false);
 
   const refresh = useCallback(async () => {
     const [gatewayResult, installResult, configResult, modelAuthResult, weixinResult] = await Promise.allSettled([
@@ -216,60 +201,6 @@ export function StatusPage({ onNavigate }: StatusPageProps) {
     }
   }, [refresh]);
 
-  const handleInstall = useCallback(() => {
-    setInstalling(true);
-    setInstallLines([]);
-    setInstallDone(false);
-    setError(null);
-    installOpenclaw(
-      (line) => setInstallLines((prev) => [...prev, line]),
-      async (result) => {
-        setInstallDone(true);
-        if (result === "success") {
-          await refresh();
-        } else {
-          setError("openclaw 安装失败");
-        }
-      }
-    );
-  }, [refresh]);
-
-  const handleUpdate = useCallback(() => {
-    setUpdating(true);
-    setUpdateLines([]);
-    setUpdateDone(false);
-    setError(null);
-    updateOpenclaw(
-      (line) => setUpdateLines((prev) => [...prev, line]),
-      async (result) => {
-        setUpdateDone(true);
-        if (result === "success") {
-          await refresh();
-        } else {
-          setError("openclaw 更新失败");
-        }
-      }
-    );
-  }, [refresh]);
-
-  const handleUninstall = useCallback(() => {
-    setUninstalling(true);
-    setUninstallLines([]);
-    setUninstallDone(false);
-    setError(null);
-    uninstallOpenclaw(
-      (line) => setUninstallLines((prev) => [...prev, line]),
-      async (result) => {
-        setUninstallDone(true);
-        if (result === "success") {
-          await refresh();
-        } else {
-          setError("openclaw 彻底卸载失败");
-        }
-      }
-    );
-  }, [refresh]);
-
   const isInstalled = info?.installed ?? false;
   const isRunning = status?.running ?? false;
   const modelConfigured = Boolean(modelAuth?.has_any_auth) || (hasText(config.provider) && hasText(config.api_key));
@@ -316,13 +247,8 @@ export function StatusPage({ onNavigate }: StatusPageProps) {
 
   if (!isInstalled) {
     nextStepTitle = "下一步：安装 openclaw";
-    nextStepDescription = "先装 CLI";
-    nextStepAction = (
-      <AppButton onClick={handleInstall} disabled={installing}>
-        <Download size={14} />
-        {installing ? "安装中…" : "一键安装 openclaw"}
-      </AppButton>
-    );
+    nextStepDescription = "去环境安装页完成安装";
+    nextStepAction = <AppButton onClick={() => onNavigate("install")}>去环境安装</AppButton>;
   } else if (!modelConfigured) {
     nextStepTitle = "下一步：连接模型";
     nextStepDescription = "去接入模型";
@@ -437,20 +363,7 @@ export function StatusPage({ onNavigate }: StatusPageProps) {
                   <span style={{ color: "var(--text-tertiary)" }}>—</span>
                 )}
               </InfoRow>
-              {isInstalled && (
-                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", minHeight: 48 }}>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <AppButton onClick={handleUpdate} disabled={updating || uninstalling} size="sm">
-                      <Download size={12} />
-                      {updating ? "更新中…" : "更新版本"}
-                    </AppButton>
-                    <AppButton onClick={handleUninstall} disabled={uninstalling || updating} tone="redSubtle" size="sm">
-                      <Trash2 size={12} />
-                      {uninstalling ? "卸载中…" : "彻底卸载"}
-                    </AppButton>
-                  </div>
-                </div>
-              )}
+
             </div>
 
             {info.path && (
@@ -571,42 +484,6 @@ export function StatusPage({ onNavigate }: StatusPageProps) {
           {error}
         </div>
       )}
-
-      <TerminalOverlay
-        title="installing openclaw"
-        lines={installLines}
-        open={installing}
-        done={installDone}
-        onClose={() => {
-          if (installDone) {
-            setInstalling(false);
-          }
-        }}
-      />
-
-      <TerminalOverlay
-        title="updating openclaw"
-        lines={updateLines}
-        open={updating}
-        done={updateDone}
-        onClose={() => {
-          if (updateDone) {
-            setUpdating(false);
-          }
-        }}
-      />
-
-      <TerminalOverlay
-        title="uninstalling openclaw"
-        lines={uninstallLines}
-        open={uninstalling}
-        done={uninstallDone}
-        onClose={() => {
-          if (uninstallDone) {
-            setUninstalling(false);
-          }
-        }}
-      />
     </div>
   );
 }
