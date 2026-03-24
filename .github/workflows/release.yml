@@ -35,18 +35,29 @@ jobs:
         run: npm ci
 
       - name: Build Tauri
-        run: npm run tauri build -- --bundles none
+        run: npm run tauri build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload binary
+      - name: Upload macOS artifacts
+        if: matrix.platform == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-binary
+          name: macos-bundle
           path: |
-            src-tauri/target/release/clawb
-            src-tauri/target/release/ClawB.exe
-          if-no-files-found: error
+            src-tauri/target/release/bundle/dmg/**/*.dmg
+            src-tauri/target/release/bundle/app/**/*.app
+          if-no-files-found: ignore
+
+      - name: Upload Windows artifacts
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-bundle
+          path: |
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
+          if-no-files-found: ignore
 
   release:
     name: Release
