@@ -4,6 +4,7 @@ import { AppButton } from "@/components/AppButton";
 import { platform } from "@/openclaw/platform";
 import { detectNode, detectOpenClaw } from "@/openclaw/detect";
 import { getGatewayStatus, startGateway, stopGateway, installGateway } from "@/openclaw/gateway";
+import { invoke } from "@tauri-apps/api/core";
 
 interface NodeInfo {
   version: string;
@@ -27,6 +28,8 @@ export function InstallPage() {
   const [openclawInfo, setOpenClawnInfo] = useState<OpenClawInfo | null>(null);
   const [gatewayStatus, setGatewayStatus] = useState<GatewayInfo>({ running: false, pid: null });
   const [gatewayLoading, setGatewayLoading] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [installProgress, setInstallProgress] = useState<string>("");
 
   useEffect(() => {
     checkStatus();
@@ -66,6 +69,24 @@ export function InstallPage() {
       setGatewayStatus({ running: gs.running, pid: gs.pid });
     } catch {
       setGatewayStatus({ running: false, pid: null });
+    }
+  };
+
+  const handleInstall = async () => {
+    setInstalling(true);
+    setInstallProgress("正在初始化安装...");
+    try {
+      const result = await invoke<{ success: boolean; error?: string }>("install_openclaw_full");
+      if (result.success) {
+        setInstallProgress("安装完成");
+      } else {
+        setInstallProgress(`安装失败: ${result.error || "未知错误"}`);
+      }
+    } catch (e) {
+      setInstallProgress(`安装失败: ${e}`);
+    } finally {
+      setInstalling(false);
+      await checkStatus();
     }
   };
 
@@ -203,35 +224,44 @@ export function InstallPage() {
       </div>
 
       <div>
-        <div className="section-title">下载 OpenClaw</div>
+        <div className="section-title">一键安装 OpenClaw</div>
         <div className="glass-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            请下载并安装 OpenClaw 独立版本，内置运行时，解压即用。
+            自动下载并安装 OpenClaw 独立版本，内置运行时，无需 Node.js 环境。
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500, minWidth: 70 }}>Windows:</span>
-              <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>下载 .exe 安装向导，双击即装</span>
+          {installProgress && (
+            <div style={{ padding: "10px 14px", borderRadius: "var(--radius-md)", fontSize: 12, background: "var(--card-bg-hover)", color: "var(--text-secondary)", fontFamily: "var(--font-mono)", maxHeight: 120, overflow: "auto" }}>
+              {installProgress}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500, minWidth: 70 }}>macOS:</span>
-              <code style={{ fontSize: 12, background: "var(--card-bg-hover)", padding: "4px 8px", borderRadius: "var(--radius-xs)", fontFamily: "var(--font-mono)" }}>
-                curl -fsSL https://dl.qrj.ai/openclaw/install.sh | bash
-              </code>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500, minWidth: 70 }}>Linux:</span>
-              <code style={{ fontSize: 12, background: "var(--card-bg-hover)", padding: "4px 8px", borderRadius: "var(--radius-xs)", fontFamily: "var(--font-mono)" }}>
-                curl -fsSL https://dl.qrj.ai/openclaw/install.sh | bash
-              </code>
-            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 12 }}>
+            <AppButton onClick={handleInstall} disabled={installing}>
+              {installing ? (
+                <>
+                  <Loader size={14} style={{ animation: "spin 1s linear infinite" }} />
+                  安装中...
+                </>
+              ) : (
+                <>
+                  <Download size={14} />
+                  一键安装
+                </>
+              )}
+            </AppButton>
+
+            <AppButton tone="secondary" onClick={() => window.open(getDownloadUrl(), "_blank")}>
+              <ExternalLink size={14} />
+              手动下载
+            </AppButton>
           </div>
 
-          <AppButton onClick={() => window.open(getDownloadUrl(), "_blank")} style={{ alignSelf: "flex-start" }}>
-            <ExternalLink size={14} />
-            下载地址
-          </AppButton>
+          <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+            {platform.isWindows
+              ? "Windows 用户推荐使用一键安装，自动下载并静默安装 OpenClaw 独立版"
+              : "macOS / Linux 用户请使用终端命令安装"}
+          </div>
         </div>
       </div>
 

@@ -644,16 +644,58 @@ async fn install_openclaw_full_windows(window: &tauri::Window) -> Result<(), Str
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-    let npm_cmd = get_npx_command_for_windows();
-    let install_cmd = format!("{} install -g openclaw --registry https://registry.npmmirror.com", npm_cmd);
+    window.emit("install-output", "正在获取 OpenClaw 独立版信息...").map_err(|e| e.to_string())?;
 
-    window.emit("install-output", &format!("使用命令: {}", install_cmd)).map_err(|e| e.to_string())?;
+    // Get latest version info from standalone releases
+    let latest_url = "https://github.com/qingchencloud/openclaw-standalone/releases/download/latest/latest.json";
+    window.emit("install-output", &format!("下载地址: {}", latest_url)).map_err(|e| e.to_string())?;
 
+    // Download the latest.json to get version info
+    let client = reqwest::Client::new();
+    let resp = client.get(latest_url)
+        .timeout(std::time::Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(|e| format!("下载版本信息失败: {}", e))?;
+
+    let latest_json: serde_json::Value = resp.json()
+        .await
+        .map_err(|e| format!("解析版本信息失败: {}", e))?;
+
+    let version = latest_json["tag_name"].as_str().unwrap_or("v2026.3.13-zh.1");
+    let download_url = latest_json["assets"][0]["browser_download_url"]
+        .as_str()
+        .ok_or("无法获取下载链接")?;
+
+    // Replace with Windows-specific asset
+    let windows_url = download_url.replace("/linux-x64.tar.gz", "/win-x64-setup.exe");
+    window.emit("install-output", &format!("下载 OpenClaw 独立安装包...")).map_err(|e| e.to_string())?;
+
+    // Download installer to temp directory
+    let temp_dir = std::env::temp_dir();
+    let installer_path = temp_dir.join("openclaw-setup.exe");
+
+    let response = client.get(&windows_url)
+        .timeout(std::time::Duration::from_secs(300))
+        .send()
+        .await
+        .map_err(|e| format!("下载安装包失败: {}", e))?;
+
+    let bytes = response.bytes().await
+        .map_err(|e| format!("读取下载内容失败: {}", e))?;
+
+    tokio::fs::write(&installer_path, bytes)
+        .await
+        .map_err(|e| format!("保存安装包失败: {}", e))?;
+
+    window.emit("install-output", "正在安装 OpenClaw（静默模式）...").map_err(|e| e.to_string())?;
+
+    // Run installer silently with /S flag for silent install
     let mut child = Command::new("cmd")
-        .args(["/C", &install_cmd])
+        .args(["/C", &format!("\"{}\" /S", installer_path.display())])
+        .creation_flags(CREATE_NO_WINDOW)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .creation_flags(CREATE_NO_WINDOW)
         .spawn()
         .map_err(|e| e.to_string())?;
 
@@ -661,18 +703,25 @@ async fn install_openclaw_full_windows(window: &tauri::Window) -> Result<(), Str
     let mut reader = BufReader::new(stdout).lines();
 
     while let Ok(Some(line)) = reader.next_line().await {
-        window.emit("install-output", &line).map_err(|e| e.to_string())?;
+        if !line.is_empty() {
+            window.emit("install-output", &line).map_err(|e| e.to_string())?;
+        }
     }
 
     let status = child.wait().await.map_err(|e| e.to_string())?;
+
+    // Clean up installer
+    let _ = tokio::fs::remove_file(&installer_path).await;
+
     if status.success() {
-        window.emit("install-done", "success").map_err(|e| e.to_string())?;
+        window.emit("install-output", "安装完成，正在配置 Gateway...").map_err(|e| e.to_string())?;
         run_shell("openclaw gateway install >NUL 2>&1 || true").await?;
         run_shell("openclaw gateway restart >NUL 2>&1 || true").await?;
+        window.emit("install-done", "success").map_err(|e| e.to_string())?;
         Ok(())
     } else {
         window.emit("install-done", "failed").map_err(|e| e.to_string())?;
-        Err("OpenClaw installation failed".to_string())
+        Err("OpenClaw 安装失败".to_string())
     }
 }
 
