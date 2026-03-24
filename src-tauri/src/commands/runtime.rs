@@ -2,6 +2,12 @@ use std::process::{Output, Stdio};
 use tokio::process::{Child, Command};
 
 #[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW_FLAG: u32 = 0x08000000;
+
+#[cfg(target_os = "windows")]
 pub const SHELL_PATH_PREFIX: &str = r#"set "PATH=C:\Program Files\nodejs;C:\Program Files\Git\cmd;C:\Program Files\Git\bin;%PATH""#;
 
 #[cfg(not(target_os = "windows"))]
@@ -60,6 +66,7 @@ pub async fn run_shell(command: &str) -> Result<String, String> {
 pub async fn run_shell_output(command: &str) -> Result<Output, String> {
     Command::new("cmd")
         .args(["/C", &with_shell_path(command)])
+        .creation_flags(CREATE_NO_WINDOW_FLAG)
         .output()
         .await
         .map_err(|e| e.to_string())
@@ -79,6 +86,7 @@ pub async fn run_shell_output(command: &str) -> Result<Output, String> {
 pub fn spawn_shell(command: &str) -> Result<Child, String> {
     Command::new("cmd")
         .args(["/C", &with_shell_path(command)])
+        .creation_flags(CREATE_NO_WINDOW_FLAG)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
