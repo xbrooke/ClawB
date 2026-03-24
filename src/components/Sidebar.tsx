@@ -60,15 +60,15 @@ export function Sidebar({ current, onChange }: SidebarProps) {
     >
       <div
         style={{
-          padding: "20px 16px 16px",
+          padding: "20px 20px 18px",
           display: "flex",
           alignItems: "center",
           gap: 10,
         }}
       >
         <svg
-          width="28"
-          height="28"
+          width="24"
+          height="24"
           viewBox="42 38 168 176"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
@@ -102,7 +102,7 @@ export function Sidebar({ current, onChange }: SidebarProps) {
             fontSize: 15,
             fontWeight: 600,
             color: "var(--text-primary)",
-            letterSpacing: "0.02em",
+            letterSpacing: "0.01em",
           }}
         >
           ClawB
@@ -112,10 +112,10 @@ export function Sidebar({ current, onChange }: SidebarProps) {
       <nav
         style={{
           flex: 1,
-          padding: "8px 12px",
+          padding: "4px 12px",
           display: "flex",
           flexDirection: "column",
-          gap: 2,
+          gap: 1,
         }}
       >
         {navItems.map(({ id, label, Icon }) => {
@@ -130,18 +130,18 @@ export function Sidebar({ current, onChange }: SidebarProps) {
                 gap: 10,
                 width: "100%",
                 textAlign: "left",
-                padding: "10px 12px",
+                padding: "9px 12px",
                 borderRadius: "var(--radius-sm)",
                 fontSize: 13,
                 fontWeight: active ? 500 : 400,
                 color: active ? "var(--accent-blue)" : "var(--text-secondary)",
                 background: active ? "var(--accent-soft)" : "transparent",
-                transition: "background 0.12s ease, color 0.12s ease",
+                transition: "all 0.1s ease",
                 cursor: "pointer",
                 border: "none",
               }}
             >
-              <Icon size={16} style={{ flexShrink: 0 }} />
+              <Icon size={16} style={{ flexShrink: 0, opacity: active ? 1 : 0.7 }} />
               {label}
             </button>
           );
@@ -150,7 +150,7 @@ export function Sidebar({ current, onChange }: SidebarProps) {
 
       <div
         style={{
-          padding: "12px",
+          padding: "16px 12px",
           borderTop: "1px solid var(--sidebar-border)",
           display: "flex",
           alignItems: "center",
@@ -162,7 +162,7 @@ export function Sidebar({ current, onChange }: SidebarProps) {
           onClick={cycleTheme}
           title={`切换主题: ${THEME_PRESETS[themeIndex]?.label}`}
           style={{
-            padding: "6px 10px",
+            padding: "5px 10px",
             borderRadius: "var(--radius-sm)",
             fontSize: 11,
             fontWeight: 500,
@@ -170,7 +170,7 @@ export function Sidebar({ current, onChange }: SidebarProps) {
             background: "transparent",
             border: "1px solid var(--card-border)",
             cursor: "pointer",
-            transition: "background 0.12s ease",
+            transition: "all 0.1s ease",
           }}
         >
           {THEME_PRESETS[themeIndex]?.label}
