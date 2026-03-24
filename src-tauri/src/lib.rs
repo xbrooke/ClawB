@@ -16,7 +16,7 @@ use commands::{
     install::{
         check_openclaw_installed, check_openclaw_version, get_command_path, get_node_info,
         get_openclaw_info, install_openclaw, install_openclaw_full, uninstall_openclaw,
-        update_openclaw,
+        update_openclaw, run_onboard,
     },
     logs::{
         get_token_optimization_report, get_token_usage, run_token_audit, run_token_treatment,

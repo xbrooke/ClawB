@@ -1,92 +1,123 @@
+/**
+ * Gateway Management Module
+ * Handles Gateway lifecycle: install, start, stop, restart, status
+ */
+
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export interface GatewayStatus {
   running: boolean;
   pid: number | null;
   message: string;
+  port?: number | null;
+  version?: string | null;
 }
 
+export interface GatewayResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
+// Get Gateway status
 export async function getGatewayStatus(): Promise<GatewayStatus> {
   try {
-    return await invoke<GatewayStatus>("get_gateway_status");
+    const result = await invoke<GatewayStatus>("get_gateway_status");
+    return result;
   } catch (e) {
-    return { running: false, pid: null, message: String(e) };
+    return {
+      running: false,
+      pid: null,
+      message: String(e),
+      port: null,
+      version: null,
+    };
   }
 }
 
-export async function startGateway(): Promise<{ success: boolean; error?: string }> {
+// Check if Gateway is running (re-exported from detect.ts)
+
+// Start Gateway
+export async function startGateway(): Promise<GatewayResult> {
   try {
     await invoke("start_gateway");
-    return { success: true };
+    return { success: true, message: "Gateway 启动成功" };
   } catch (e) {
     return { success: false, error: String(e) };
   }
 }
 
-export async function stopGateway(): Promise<{ success: boolean; error?: string }> {
+// Stop Gateway
+export async function stopGateway(): Promise<GatewayResult> {
   try {
     await invoke("stop_gateway");
-    return { success: true };
+    return { success: true, message: "Gateway 已停止" };
   } catch (e) {
     return { success: false, error: String(e) };
   }
 }
 
-export async function installGateway(): Promise<{ success: boolean; error?: string }> {
-  try {
-    await invoke("install_gateway");
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: String(e) };
-  }
-}
-
-export async function uninstallGateway(): Promise<{ success: boolean; error?: string }> {
-  try {
-    await invoke("uninstall_gateway");
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: String(e) };
-  }
-}
-
-export async function restartGateway(): Promise<{ success: boolean; error?: string }> {
+// Restart Gateway
+export async function restartGateway(): Promise<GatewayResult> {
   try {
     await invoke("restart_gateway");
-    return { success: true };
+    return { success: true, message: "Gateway 重启成功" };
   } catch (e) {
     return { success: false, error: String(e) };
   }
 }
 
-export async function listenGatewayOutput(
-  callback: (line: string) => void
-): Promise<UnlistenFn> {
-  return listen<string>("gateway-output", (event) => {
-    callback(event.payload);
-  });
-}
-
-export async function listenGatewayStatus(
-  callback: (status: GatewayStatus) => void
-): Promise<UnlistenFn> {
-  return listen<GatewayStatus>("gateway-status", (event) => {
-    callback(event.payload);
-  });
-}
-
-export function buildGatewayCommand(action: "start" | "stop" | "restart" | "install" | "uninstall"): string {
-  switch (action) {
-    case "start":
-      return `openclaw gateway start`;
-    case "stop":
-      return `openclaw gateway stop`;
-    case "restart":
-      return `openclaw gateway restart`;
-    case "install":
-      return `openclaw gateway install`;
-    case "uninstall":
-      return `openclaw gateway uninstall`;
+// Install Gateway service
+export async function installGatewayService(): Promise<GatewayResult> {
+  try {
+    await invoke("install_gateway");
+    return { success: true, message: "Gateway 服务安装成功" };
+  } catch (e) {
+    return { success: false, error: String(e) };
   }
+}
+
+// Uninstall Gateway service
+export async function uninstallGatewayService(): Promise<GatewayResult> {
+  try {
+    await invoke("uninstall_gateway");
+    return { success: true, message: "Gateway 服务已卸载" };
+  } catch (e) {
+    return { success: false, error: String(e) };
+  }
+}
+
+// Get Gateway health
+export async function getGatewayHealth(): Promise<{ healthy: boolean; latency?: number }> {
+  try {
+    const result = await invoke<{ healthy: boolean; latency?: number }>("gateway_health");
+    return result;
+  } catch {
+    return { healthy: false };
+  }
+}
+
+// Wait for Gateway to be ready
+export async function waitForGateway(timeout: number = 30000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const status = await getGatewayStatus();
+    if (status.running) {
+      return true;
+    }
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  return false;
+}
+
+// Stream Gateway logs
+export async function streamGatewayLogs(
+  onLine: (line: string) => void
+): Promise<() => void> {
+  const unlisten = await invoke<() => void>("listen_gateway_logs", {
+    callback: (line: string) => {
+      onLine(line);
+    },
+  });
+  return unlisten;
 }

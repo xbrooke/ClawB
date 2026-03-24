@@ -1,19 +1,34 @@
-import { useEffect, useState } from "react";
-import { Loader, CheckCircle, XCircle, Cpu, Zap, Play, Square, RotateCw, Download, ExternalLink } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Loader, CheckCircle, XCircle, Cpu, Zap, Play, Square, RotateCw, Download, ExternalLink, AlertCircle } from "lucide-react";
 import { AppButton } from "@/components/AppButton";
 import { platform } from "@/openclaw/platform";
-import { detectNode, detectOpenClaw } from "@/openclaw/detect";
-import { getGatewayStatus, startGateway, stopGateway, installGateway } from "@/openclaw/gateway";
-import { invoke } from "@tauri-apps/api/core";
+import {
+  detectNode,
+  detectOpenClaw,
+  detectGateway,
+  InstallState,
+} from "@/openclaw/detect";
+import {
+  installOpenClaw,
+  onboardOpenClaw,
+  startGatewayService,
+  stopGatewayService,
+  restartGatewayService,
+  getRequiredActions,
+  InstallStage,
+  type InstallResult,
+} from "@/openclaw/install";
+
 
 interface NodeInfo {
-  version: string;
-  path: string;
+  version: string | null;
+  path: string | null;
 }
 
 interface OpenClawInfo {
-  version: string;
-  path: string;
+  version: string | null;
+  path: string | null;
+  hasConfig: boolean;
 }
 
 interface GatewayInfo {
@@ -22,125 +37,168 @@ interface GatewayInfo {
 }
 
 export function InstallPage() {
-  const [nodeStatus, setNodeStatus] = useState<"checking" | "installed" | "missing">("checking");
+  const [detecting, setDetecting] = useState(true);
   const [nodeInfo, setNodeInfo] = useState<NodeInfo | null>(null);
-  const [openclawStatus, setOpenclawStatus] = useState<"checking" | "installed" | "missing">("checking");
-  const [openclawInfo, setOpenClawnInfo] = useState<OpenClawInfo | null>(null);
-  const [gatewayStatus, setGatewayStatus] = useState<GatewayInfo>({ running: false, pid: null });
-  const [gatewayLoading, setGatewayLoading] = useState(false);
-  const [installing, setInstalling] = useState(false);
-  const [installProgress, setInstallProgress] = useState<string>("");
+  const [openclawInfo, setOpenclawInfo] = useState<OpenClawInfo | null>(null);
+  const [gatewayInfo, setGatewayInfo] = useState<GatewayInfo>({ running: false, pid: null });
+  const [installState, setInstallState] = useState<InstallState>(InstallState.UNKNOWN);
+
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string>("");
+  const [issues, setIssues] = useState<string[]>([]);
+
+  // Progress callback for installation
+  const handleProgress = useCallback((_stage: InstallStage, message: string) => {
+    setProgress(message);
+  }, []);
+
+  // Detect current status
+  const checkStatus = useCallback(async () => {
+    setDetecting(true);
+    try {
+      const [node, openclaw, gateway] = await Promise.all([
+        detectNode(),
+        detectOpenClaw(),
+        detectGateway(),
+      ]);
+
+      setNodeInfo({
+        version: node.version,
+        path: node.path,
+      });
+
+      setOpenclawInfo({
+        version: openclaw.version,
+        path: openclaw.path,
+        hasConfig: openclaw.hasConfig,
+      });
+
+      setGatewayInfo({
+        running: gateway.running,
+        pid: gateway.pid,
+      });
+
+      // Determine state
+      if (!node.exists || !openclaw.exists) {
+        setInstallState(InstallState.NOT_INSTALLED);
+      } else if (!openclaw.hasConfig) {
+        setInstallState(InstallState.CONFIG_MISSING);
+      } else if (!gateway.running) {
+        setInstallState(InstallState.INSTALLED);
+      } else {
+        setInstallState(InstallState.READY);
+      }
+
+      // Get issues
+      const actions = await getRequiredActions();
+      setIssues(actions.issues);
+    } catch (e) {
+      console.error("Status check failed:", e);
+    } finally {
+      setDetecting(false);
+    }
+  }, []);
 
   useEffect(() => {
     checkStatus();
-  }, []);
+  }, [checkStatus]);
 
-  const checkStatus = async () => {
-    setNodeStatus("checking");
-    setOpenclawStatus("checking");
-
-    try {
-      const nodeResult = await detectNode();
-      if (nodeResult.installed) {
-        setNodeStatus("installed");
-        setNodeInfo({ version: nodeResult.version ?? "unknown", path: nodeResult.path ?? "" });
-      } else {
-        setNodeStatus("missing");
-      }
-    } catch {
-      setNodeStatus("missing");
-    }
-
-    try {
-      const ocResult = await detectOpenClaw();
-      if (ocResult.installed) {
-        setOpenclawStatus("installed");
-        setOpenClawnInfo({ version: ocResult.version ?? "unknown", path: ocResult.path ?? "" });
-        setGatewayStatus({ running: ocResult.gatewayRunning, pid: ocResult.gatewayPid });
-      } else {
-        setOpenclawStatus("missing");
-      }
-    } catch {
-      setOpenclawStatus("missing");
-    }
-
-    try {
-      const gs = await getGatewayStatus();
-      setGatewayStatus({ running: gs.running, pid: gs.pid });
-    } catch {
-      setGatewayStatus({ running: false, pid: null });
-    }
-  };
-
+  // Handle Install button
   const handleInstall = async () => {
-    setInstalling(true);
-    setInstallProgress("正在初始化安装...");
+    setActionLoading("install");
+    setProgress("开始安装...");
     try {
-      const result = await invoke<{ success: boolean; error?: string }>("install_openclaw_full");
+      const result = await installOpenClaw(handleProgress);
       if (result.success) {
-        setInstallProgress("安装完成");
+        setProgress("安装完成！");
       } else {
-        setInstallProgress(`安装失败: ${result.error || "未知错误"}`);
+        setProgress(`安装失败: ${result.error}`);
       }
     } catch (e) {
-      setInstallProgress(`安装失败: ${e}`);
+      setProgress(`安装失败: ${e}`);
     } finally {
-      setInstalling(false);
+      setActionLoading(null);
       await checkStatus();
     }
   };
 
-  const handleGatewayAction = async (action: "start" | "stop" | "restart" | "install") => {
-    setGatewayLoading(true);
+  // Handle Onboard button
+  const handleOnboard = async () => {
+    setActionLoading("onboard");
+    setProgress("正在初始化...");
     try {
-      if (action === "start") {
-        await startGateway();
-      } else if (action === "stop") {
-        await stopGateway();
-      } else if (action === "restart") {
-        await stopGateway();
-        await new Promise(r => setTimeout(r, 500));
-        await startGateway();
-      } else if (action === "install") {
-        await installGateway();
+      const result = await onboardOpenClaw(handleProgress);
+      if (result.success) {
+        setProgress("初始化完成！");
+      } else {
+        setProgress(`初始化失败: ${result.error}`);
       }
     } catch (e) {
-      console.error(e);
+      setProgress(`初始化失败: ${e}`);
     } finally {
-      setGatewayLoading(false);
+      setActionLoading(null);
       await checkStatus();
     }
   };
 
-  const StatusIndicator = ({ status, label, sublabel }: { status: "checking" | "installed" | "missing"; label: string; sublabel?: string }) => {
+  // Handle Gateway action
+  const handleGatewayAction = async (action: "start" | "stop" | "restart") => {
+    setActionLoading(action);
+    setProgress("");
+    try {
+      let result: InstallResult;
+      if (action === "start") {
+        result = await startGatewayService();
+      } else if (action === "stop") {
+        result = await stopGatewayService();
+      } else {
+        result = await restartGatewayService();
+      }
+      if (result.success) {
+        setProgress(result.message || "操作完成");
+      } else {
+        setProgress(`操作失败: ${result.error}`);
+      }
+    } catch (e) {
+      setProgress(`操作失败: ${e}`);
+    } finally {
+      setActionLoading(null);
+      await checkStatus();
+    }
+  };
+
+  // Render status indicator
+  const StatusIndicator = ({ status, label, sublabel }: {
+    status: "checking" | "installed" | "missing" | "ready";
+    label: string;
+    sublabel?: string;
+  }) => {
     if (status === "checking") {
       return (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Loader size={16} style={{ color: "var(--accent-orange)", animation: "spin 1s linear infinite" }} />
           <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>检测中...</span>
         </div>
       );
     }
-    if (status === "installed") {
+    if (status === "installed" || status === "ready") {
       return (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <CheckCircle size={16} style={{ color: "var(--accent-green)" }} />
-          <div>
-            <span style={{ fontSize: 13, color: "var(--accent-green)", fontWeight: 500 }}>{label}</span>
-            {sublabel && <span style={{ fontSize: 12, color: "var(--text-tertiary)", marginLeft: 8 }}>{sublabel}</span>}
-          </div>
+          <span style={{ fontSize: 13, color: "var(--accent-green)", fontWeight: 500 }}>{label}</span>
+          {sublabel && <span style={{ fontSize: 12, color: "var(--text-tertiary)", marginLeft: 4 }}>{sublabel}</span>}
         </div>
       );
     }
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <XCircle size={16} style={{ color: "var(--accent-red)" }} />
         <span style={{ fontSize: 13, color: "var(--accent-red)" }}>{label}</span>
       </div>
     );
   };
 
-  // Get download URL based on platform
+  // Get download URL
   const getDownloadUrl = () => {
     return "https://github.com/qingchencloud/openclaw-standalone/releases/latest";
   };
@@ -149,124 +207,224 @@ export function InstallPage() {
     <div className="page-container" style={{ maxWidth: 640 }}>
       <div>
         <h1 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 4px 0" }}>环境安装</h1>
-        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>管理 OpenClaw 运行环境和网关服务</p>
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
+          {detecting ? "正在检测环境..." : `当前状态: ${installState}`}
+        </p>
       </div>
 
+      {/* Status Cards */}
       <div>
-        <div className="section-title">运行环境</div>
+        <div className="section-title">环境状态</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* Node.js Status */}
           <div className="glass-card" style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <Cpu size={18} style={{ color: "var(--accent-blue)" }} />
               <div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Node.js</div>
                 <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                  {nodeInfo ? `v${nodeInfo.version}` : platform.isWindows ? "Windows" : "macOS / Linux"}
+                  {nodeInfo?.version ? `v${nodeInfo.version}` : (platform.isWindows ? "Windows" : "macOS / Linux")}
                 </div>
               </div>
             </div>
-            <StatusIndicator status={nodeStatus} label={nodeStatus === "installed" ? "已安装" : "未安装"} />
+            <StatusIndicator
+              status={nodeInfo?.version ? "installed" : "missing"}
+              label={nodeInfo?.version ? "已安装" : "未安装"}
+            />
           </div>
 
+          {/* OpenClaw Status */}
           <div className="glass-card" style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <Zap size={18} style={{ color: "var(--accent-purple)" }} />
               <div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>OpenClaw</div>
                 <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                  {openclawInfo ? `v${openclawInfo.version}` : "消息渠道核心"}
+                  {openclawInfo?.version ? `v${openclawInfo.version}` : "消息渠道核心"}
+                  {openclawInfo?.hasConfig === false && <span style={{ color: "var(--accent-orange)" }}> (未初始化)</span>}
                 </div>
               </div>
             </div>
-            <StatusIndicator status={openclawStatus} label={openclawStatus === "installed" ? "已安装" : "未安装"} />
+            <StatusIndicator
+              status={openclawInfo?.version ? (openclawInfo.hasConfig ? "ready" : "installed") : "missing"}
+              label={!openclawInfo?.version ? "未安装" : openclawInfo.hasConfig ? "就绪" : "已安装"}
+            />
           </div>
-        </div>
-      </div>
 
-      <div>
-        <div className="section-title">网关服务</div>
-        <div className="glass-card" style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div className={`status-dot ${gatewayStatus.running ? "running" : "stopped"}`} style={{ margin: 0 }} />
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Gateway</div>
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                {gatewayStatus.running ? `PID: ${gatewayStatus.pid}` : "未运行"}
+          {/* Gateway Status */}
+          <div className="glass-card" style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                className={`status-dot ${gatewayInfo.running ? "running" : "stopped"}`}
+                style={{ margin: 0 }}
+              />
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Gateway</div>
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                  {gatewayInfo.running ? `运行中 (PID: ${gatewayInfo.pid})` : "未运行"}
+                </div>
               </div>
             </div>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            {!gatewayStatus.running ? (
-              <>
-                <AppButton size="sm" tone="secondary" onClick={() => handleGatewayAction("install")} disabled={gatewayLoading || openclawStatus !== "installed"}>
-                  <Download size={13} />
-                  安装
-                </AppButton>
-                <AppButton size="sm" onClick={() => handleGatewayAction("start")} disabled={gatewayLoading || openclawStatus !== "installed"}>
-                  <Play size={13} />
-                  启动
-                </AppButton>
-              </>
-            ) : (
-              <>
-                <AppButton size="sm" tone="secondary" onClick={() => handleGatewayAction("restart")} disabled={gatewayLoading}>
-                  <RotateCw size={13} />
-                  重启
-                </AppButton>
-                <AppButton size="sm" tone="redSubtle" onClick={() => handleGatewayAction("stop")} disabled={gatewayLoading}>
-                  <Square size={13} />
-                  停止
-                </AppButton>
-              </>
-            )}
+            <StatusIndicator
+              status={gatewayInfo.running ? "ready" : "missing"}
+              label={gatewayInfo.running ? "运行中" : "已停止"}
+            />
           </div>
         </div>
       </div>
 
-      <div>
-        <div className="section-title">一键安装 OpenClaw</div>
-        <div className="glass-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            自动下载并安装 OpenClaw 独立版本，内置运行时，无需 Node.js 环境。
+      {/* Issues */}
+      {issues.length > 0 && (
+        <div>
+          <div className="section-title">待处理问题</div>
+          <div className="glass-card" style={{ padding: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {issues.map((issue, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <AlertCircle size={14} style={{ color: "var(--accent-orange)" }} />
+                  <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{issue}</span>
+                </div>
+              ))}
+            </div>
           </div>
+        </div>
+      )}
 
-          {installProgress && (
-            <div style={{ padding: "10px 14px", borderRadius: "var(--radius-md)", fontSize: 12, background: "var(--card-bg-hover)", color: "var(--text-secondary)", fontFamily: "var(--font-mono)", maxHeight: 120, overflow: "auto" }}>
-              {installProgress}
+      {/* Actions */}
+      <div>
+        <div className="section-title">操作</div>
+        <div className="glass-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Progress output */}
+          {progress && (
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: "var(--radius-md)",
+                fontSize: 12,
+                background: "var(--card-bg-hover)",
+                color: "var(--text-secondary)",
+                fontFamily: "var(--font-mono)",
+                maxHeight: 100,
+                overflow: "auto",
+              }}
+            >
+              {progress}
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 12 }}>
-            <AppButton onClick={handleInstall} disabled={installing}>
-              {installing ? (
-                <>
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {/* Install button - show when not installed or config missing */}
+            {(installState === InstallState.NOT_INSTALLED || installState === InstallState.CONFIG_MISSING) && (
+              <AppButton
+                onClick={handleInstall}
+                disabled={actionLoading !== null}
+              >
+                {actionLoading === "install" ? (
                   <Loader size={14} style={{ animation: "spin 1s linear infinite" }} />
-                  安装中...
-                </>
-              ) : (
-                <>
+                ) : (
                   <Download size={14} />
-                  一键安装
-                </>
-              )}
-            </AppButton>
+                )}
+                {installState === InstallState.NOT_INSTALLED ? "安装 OpenClaw" : "重新安装"}
+              </AppButton>
+            )}
 
-            <AppButton tone="secondary" onClick={() => window.open(getDownloadUrl(), "_blank")}>
-              <ExternalLink size={14} />
-              手动下载
+            {/* Onboard button - show when installed but no config */}
+            {installState === InstallState.INSTALLED && (
+              <AppButton
+                onClick={handleOnboard}
+                disabled={actionLoading !== null}
+              >
+                {actionLoading === "onboard" ? (
+                  <Loader size={14} style={{ animation: "spin 1s linear infinite" }} />
+                ) : (
+                  <Zap size={14} />
+                )}
+                初始化 OpenClaw
+              </AppButton>
+            )}
+
+            {/* Gateway controls - show when ready */}
+            {installState === InstallState.READY && (
+              <>
+                {!gatewayInfo.running ? (
+                  <AppButton onClick={() => handleGatewayAction("start")} disabled={actionLoading !== null}>
+                    <Play size={14} />
+                    启动 Gateway
+                  </AppButton>
+                ) : (
+                  <>
+                    <AppButton
+                      tone="secondary"
+                      onClick={() => handleGatewayAction("restart")}
+                      disabled={actionLoading !== null}
+                    >
+                      <RotateCw size={14} />
+                      重启
+                    </AppButton>
+                    <AppButton
+                      tone="redSubtle"
+                      onClick={() => handleGatewayAction("stop")}
+                      disabled={actionLoading !== null}
+                    >
+                      <Square size={14} />
+                      停止
+                    </AppButton>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Refresh button */}
+            <AppButton tone="secondary" onClick={checkStatus} disabled={actionLoading !== null || detecting}>
+              <Loader size={14} />
+              刷新状态
             </AppButton>
           </div>
 
+          {/* Help text */}
           <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-            {platform.isWindows
-              ? "Windows 用户推荐使用一键安装，自动下载并静默安装 OpenClaw 独立版"
-              : "macOS / Linux 用户请使用终端命令安装"}
+            {installState === InstallState.NOT_INSTALLED && "点击上方按钮安装 OpenClaw"}
+            {installState === InstallState.CONFIG_MISSING && "OpenClaw 已安装，需要初始化配置"}
+            {installState === InstallState.INSTALLED && "Gateway 未运行，请先初始化或启动"}
+            {installState === InstallState.READY && gatewayInfo.running && "一切就绪！Gateway 正在运行"}
+            {installState === InstallState.READY && !gatewayInfo.running && "Gateway 未运行"}
           </div>
+        </div>
+      </div>
+
+      {/* Manual Download */}
+      <div>
+        <div className="section-title">手动下载</div>
+        <div className="glass-card" style={{ padding: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between" }}>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+              {platform.isWindows
+                ? "下载 Windows 独立安装包"
+                : "使用终端命令安装"}
+            </div>
+            <AppButton
+              tone="secondary"
+              size="sm"
+              onClick={() => window.open(getDownloadUrl(), "_blank")}
+            >
+              <ExternalLink size={13} />
+              下载地址
+            </AppButton>
+          </div>
+          {platform.isWindows && (
+            <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 8 }}>
+              Windows 用户也可以双击 .exe 文件进行安装
+            </div>
+          )}
         </div>
       </div>
 
       <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
       `}</style>
     </div>
   );

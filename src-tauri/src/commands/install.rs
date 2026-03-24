@@ -753,6 +753,32 @@ pub async fn get_openclaw_info() -> Result<InstallInfo, String> {
     }
 }
 
+#[tauri::command]
+pub async fn run_onboard() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let output = Command::new("cmd")
+            .args(["/C", "openclaw onboard --install-daemon"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Err("onboard failed".to_string());
+        }
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let output = run_shell_output("openclaw onboard --install-daemon 2>&1").await?;
+        if !output.status.success() {
+            return Err("onboard failed".to_string());
+        }
+        Ok(())
+    }
+}
+
 #[cfg(target_os = "windows")]
 async fn get_openclaw_info_windows() -> Result<InstallInfo, String> {
     let output = Command::new("cmd")

@@ -1,13 +1,13 @@
+/**
+ * OpenClaw Module - Main Entry Point
+ */
+
+// Re-export platform and detect
 export * from "./platform";
 export * from "./detect";
-export * from "./exec";
-export * from "./gateway";
-export * from "./install";
 
-export interface OpenClawModule {
-  platform: ReturnType<typeof import("./platform").detectPlatform>;
-  detect: typeof import("./detect");
-  exec: typeof import("./exec");
-  gateway: typeof import("./gateway");
-  install: typeof import("./install");
-}
+// Re-export gateway (includes isGatewayRunning)
+export * from "./gateway";
+
+// Re-export install
+export * from "./install";
