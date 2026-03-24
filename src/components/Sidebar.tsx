@@ -132,7 +132,7 @@ export function Sidebar({ current, onChange }: SidebarProps) {
                 width: "100%",
                 textAlign: "left",
                 padding: "9px 12px",
-                borderRadius: "var(--radius-sm)",
+                borderRadius: "var(--radius-xs)",
                 fontSize: 13,
                 fontWeight: active ? 500 : 400,
                 color: active ? "var(--accent-blue)" : "var(--text-secondary)",

@@ -58,7 +58,7 @@ export function AppButton({
         gap: 6,
         padding: size === "md" ? "7px 14px" : "5px 10px",
         minHeight: size === "md" ? 32 : 28,
-        borderRadius: 8,
+        borderRadius: "var(--radius-md)",
         fontSize: size === "md" ? 13 : 12,
         fontWeight: 500,
         lineHeight: 1.2,

@@ -85,11 +85,18 @@ export function TitleBar() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: 4,
+            borderRadius: "var(--radius-xs)",
             border: "none",
             background: "transparent",
             cursor: "pointer",
             color: "var(--text-secondary)",
+            transition: "background 0.1s ease, color 0.1s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--card-bg-hover)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
           }}
         >
           <Minus size={14} />
@@ -102,11 +109,18 @@ export function TitleBar() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: 4,
+            borderRadius: "var(--radius-xs)",
             border: "none",
             background: "transparent",
             cursor: "pointer",
             color: "var(--text-secondary)",
+            transition: "background 0.1s ease, color 0.1s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--card-bg-hover)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
           }}
         >
           {isMaximized ? <MinusSquare size={14} /> : <Square size={12} />}
@@ -119,11 +133,12 @@ export function TitleBar() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: 4,
+            borderRadius: "var(--radius-xs)",
             border: "none",
             background: "transparent",
             cursor: "pointer",
             color: "var(--text-secondary)",
+            transition: "background 0.1s ease, color 0.1s ease",
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = "var(--accent-red)";

@@ -225,7 +225,7 @@ export function InstallPage() {
             自动检测并安装 Node.js 和 OpenClaw，包括网关服务的安装和配置。
           </div>
           {installProgress && (
-            <div style={{ padding: "10px 14px", borderRadius: 8, fontSize: 12, background: "var(--card-bg-hover)", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
+            <div style={{ padding: "10px 14px", borderRadius: "var(--radius-md)", fontSize: 12, background: "var(--card-bg-hover)", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
               {installProgress}
             </div>
           )}
