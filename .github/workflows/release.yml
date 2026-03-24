@@ -7,6 +7,9 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build
@@ -32,20 +35,18 @@ jobs:
         run: npm ci
 
       - name: Build Tauri
-        uses: tauri-apps/tauri-action@v0
+        run: npm run tauri build -- --bundles none
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload artifact
+      - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-bundle
+          name: ${{ matrix.platform }}-binary
           path: |
-            src-tauri/target/release/bundle/**/*.dmg
-            src-tauri/target/release/bundle/**/*.app
-            src-tauri/target/release/bundle/**/*.exe
-            src-tauri/target/release/bundle/**/*.msi
-          if-no-files-found: ignore
+            src-tauri/target/release/clawb
+            src-tauri/target/release/ClawB.exe
+          if-no-files-found: error
 
   release:
     name: Release
