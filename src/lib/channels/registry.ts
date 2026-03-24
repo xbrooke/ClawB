@@ -1,6 +1,10 @@
 import type { Channel, SendPayload } from "./types";
 import { WeChatChannel } from "./wechat";
 import { FeishuChannel } from "./feishu";
+import { TelegramChannel } from "./telegram";
+import { DiscordChannel } from "./discord";
+import { DingTalkChannel } from "./dingtalk";
+import { QQChannel } from "./qq";
 
 class ChannelRegistry {
   private channels: Map<string, Channel> = new Map();
@@ -8,6 +12,10 @@ class ChannelRegistry {
   constructor() {
     this.register(new WeChatChannel());
     this.register(new FeishuChannel());
+    this.register(new TelegramChannel());
+    this.register(new DiscordChannel());
+    this.register(new DingTalkChannel());
+    this.register(new QQChannel());
   }
 
   register(channel: Channel): void {
@@ -20,6 +28,10 @@ class ChannelRegistry {
 
   list(): Channel[] {
     return Array.from(this.channels.values());
+  }
+
+  listByType(type: "config" | "bind"): Channel[] {
+    return Array.from(this.channels.values()).filter((ch) => ch.type === type);
   }
 
   async sendMessage(channelId: string, payload: SendPayload): Promise<void> {
