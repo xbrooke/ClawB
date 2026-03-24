@@ -457,66 +457,82 @@ async fn remove_runtime_data() -> Result<(), String> {
 
 #[tauri::command]
 pub async fn check_openclaw_installed() -> Result<InstallInfo, String> {
-    // Try `which openclaw`
-    let path_result = Command::new("sh")
-        .arg("-c")
-        .arg(with_shell_path("which openclaw 2>/dev/null"))
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let path_str = String::from_utf8_lossy(&path_result.stdout)
-        .trim()
-        .to_string();
-
-    if path_str.is_empty() {
-        return Ok(InstallInfo {
-            installed: false,
-            version: None,
-            path: None,
-        });
+    #[cfg(target_os = "windows")]
+    {
+        get_openclaw_info_windows().await
     }
 
-    // Get version
-    let version_result = Command::new("sh")
-        .arg("-c")
-        .arg(with_shell_path("openclaw --version 2>&1"))
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Try `which openclaw`
+        let path_result = Command::new("sh")
+            .arg("-c")
+            .arg(with_shell_path("which openclaw 2>/dev/null"))
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
 
-    let version_str = String::from_utf8_lossy(&version_result.stdout)
-        .trim()
-        .to_string();
+        let path_str = String::from_utf8_lossy(&path_result.stdout)
+            .trim()
+            .to_string();
 
-    let version = if version_str.is_empty() {
-        None
-    } else {
-        Some(version_str)
-    };
+        if path_str.is_empty() {
+            return Ok(InstallInfo {
+                installed: false,
+                version: None,
+                path: None,
+            });
+        }
 
-    Ok(InstallInfo {
-        installed: true,
-        version,
-        path: Some(path_str),
-    })
+        // Get version
+        let version_result = Command::new("sh")
+            .arg("-c")
+            .arg(with_shell_path("openclaw --version 2>&1"))
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let version_str = String::from_utf8_lossy(&version_result.stdout)
+            .trim()
+            .to_string();
+
+        let version = if version_str.is_empty() {
+            None
+        } else {
+            Some(version_str)
+        };
+
+        Ok(InstallInfo {
+            installed: true,
+            version,
+            path: Some(path_str),
+        })
+    }
 }
 
 #[tauri::command]
 pub async fn install_openclaw(window: tauri::Window) -> Result<(), String> {
-    let child = Command::new("bash")
-        .arg("-lc")
-        .arg(OPENCLAW_INSTALL_SCRIPT)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    {
+        install_openclaw_full_windows(&window).await
+    }
 
-    stream_command_output(&window, child).await?;
-    restore_runtime_from_preserved_config(&window).await?;
-    run_shell("openclaw gateway install >/dev/null 2>&1 || true").await?;
-    run_shell("openclaw gateway restart >/dev/null 2>&1 || true").await?;
-    Ok(())
+    #[cfg(not(target_os = "windows"))]
+    {
+        let child = Command::new("bash")
+            .arg("-lc")
+            .arg(OPENCLAW_INSTALL_SCRIPT)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+
+        stream_command_output(&window, child).await?;
+        restore_runtime_from_preserved_config(&window).await?;
+        run_shell("openclaw gateway install >/dev/null 2>&1 || true").await?;
+        run_shell("openclaw gateway restart >/dev/null 2>&1 || true").await?;
+        Ok(())
+    }
 }
 
 #[tauri::command]
