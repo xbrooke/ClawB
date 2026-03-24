@@ -1,10 +1,34 @@
 use chrono::{Duration, NaiveDate, Utc};
-use crate::commands::runtime::{clean_openclaw_output, run_shell, shell_escape};
+use crate::commands::runtime::{clean_openclaw_output, run_shell, shell_escape, with_shell_path};
 use dirs::home_dir;
 use std::path::PathBuf;
 use tauri::Emitter;
 use tokio::fs;
 use tokio::io::AsyncBufReadExt;
+
+#[cfg(target_os = "windows")]
+fn get_npx_command() -> String {
+    let node_paths = [
+        r"C:\Program Files\nodejs",
+        r"C:\Program Files (x86)\nodejs",
+    ];
+    for path in &node_paths {
+        let npx_path = format!(r"{}\npx.cmd", path);
+        if std::path::Path::new(&npx_path).exists() {
+            return npx_path;
+        }
+        let npm_path = format!(r"{}\npm.cmd", path);
+        if std::path::Path::new(&npm_path).exists() {
+            return format!(r"{}\npx.cmd", path);
+        }
+    }
+    "npx".to_string()
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_npx_command() -> String {
+    "npx".to_string()
+}
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct DayUsage {
@@ -883,7 +907,40 @@ pub async fn test_feishu_connection(app_id: String, app_secret: String) -> Resul
     Ok(code == 0)
 }
 
-#[tauri::command]
+#[cfg(target_os = "windows")]
+pub async fn install_weixin_plugin(window: tauri::Window) -> Result<(), String> {
+    let npx_cmd = get_npx_command();
+    let full_cmd = format!(
+        r#"{} && {} -y @tencent-weixin/openclaw-weixin-cli@latest install"#,
+        with_shell_path(""),
+        npx_cmd
+    );
+
+    let mut child = tokio::process::Command::new("cmd")
+        .args(["/C", &full_cmd])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
+    let reader = tokio::io::BufReader::new(stdout);
+    let mut lines = reader.lines();
+
+    while let Ok(Some(line)) = lines.next_line().await {
+        window.emit("install-output", &line).map_err(|e| e.to_string())?;
+    }
+
+    let status = child.wait().await.map_err(|e| e.to_string())?;
+    if status.success() {
+        window.emit("install-done", "success").map_err(|e| e.to_string())?;
+    } else {
+        window.emit("install-done", "failed").map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
 pub async fn install_weixin_plugin(window: tauri::Window) -> Result<(), String> {
     let mut child = tokio::process::Command::new("npx")
         .args(["-y", "@tencent-weixin/openclaw-weixin-cli@latest", "install"])
