@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Activity, Settings, Puzzle, BarChart3, MessageSquare, Stethoscope, Info, LucideIcon } from "lucide-react";
+import { Activity, Settings, Puzzle, BarChart3, MessageSquare, Stethoscope, Info, LucideIcon, Download } from "lucide-react";
 
-export type Page = "status" | "config" | "platforms" | "skills" | "usage" | "diagnosis" | "about";
+export type Page = "status" | "config" | "platforms" | "skills" | "usage" | "diagnosis" | "about" | "install";
 
 const navItems: { id: Page; label: string; Icon: LucideIcon }[] = [
   { id: "status", label: "仪表盘", Icon: Activity },
@@ -10,6 +10,7 @@ const navItems: { id: Page; label: string; Icon: LucideIcon }[] = [
   { id: "skills", label: "Skills", Icon: Puzzle },
   { id: "usage", label: "Token 统计", Icon: BarChart3 },
   { id: "diagnosis", label: "诊断修复", Icon: Stethoscope },
+  { id: "install", label: "环境安装", Icon: Download },
   { id: "about", label: "关于", Icon: Info },
 ];
 

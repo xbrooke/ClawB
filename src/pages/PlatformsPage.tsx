@@ -277,14 +277,14 @@ export function PlatformsPage() {
   const meta = CHANNEL_META[activeId];
 
   return (
-    <div style={{ padding: "48px 40px 60px", maxWidth: 680, width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", gap: 32 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h1 style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.01em", margin: 0 }}>
-          消息渠道
-        </h1>
+    <div className="page-container" style={{ maxWidth: 640 }}>
+      <div>
+        <h1 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 4px 0" }}>消息渠道</h1>
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>管理消息推送渠道和绑定状态</p>
       </div>
 
-      <div className="glass-card" style={{ padding: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+      <div className="section-title">渠道列表</div>
+      <div className="glass-card" style={{ padding: 6, display: "flex", flexDirection: "column", gap: 2 }}>
         {allChannels.map((ch) => {
           const m = CHANNEL_META[ch.id];
           if (!m) return null;

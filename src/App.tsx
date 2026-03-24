@@ -8,6 +8,7 @@ import { SkillsPage } from "./pages/SkillsPage";
 import { TokenUsagePage } from "./pages/TokenUsagePage";
 import { PlatformsPage } from "./pages/PlatformsPage";
 import { AboutPage } from "./pages/AboutPage";
+import { InstallPage } from "./pages/InstallPage";
 
 export default function App() {
   const [page, setPage] = useState<Page>("status");
@@ -26,6 +27,7 @@ export default function App() {
     usage: <TokenUsagePage />,
     about: <AboutPage />,
     diagnosis: <DiagnosisPage onNavigate={handlePageChange} />,
+    install: <InstallPage />,
   };
 
   return (
