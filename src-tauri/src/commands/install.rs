@@ -593,3 +593,223 @@ pub async fn uninstall_openclaw(window: tauri::Window) -> Result<(), String> {
 
     result
 }
+
+#[tauri::command]
+pub async fn install_openclaw_full(window: tauri::Window) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        install_openclaw_full_windows(&window).await
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let child = Command::new("bash")
+            .arg("-lc")
+            .arg(OPENCLAW_INSTALL_SCRIPT)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        stream_command_output(&window, child).await?;
+        restore_runtime_from_preserved_config(&window).await?;
+        run_shell("openclaw gateway install >/dev/null 2>&1 || true").await?;
+        run_shell("openclaw gateway restart >/dev/null 2>&1 || true").await?;
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "windows")]
+async fn install_openclaw_full_windows(window: &tauri::Window) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+    let npm_cmd = get_npx_command_for_windows();
+    let install_cmd = format!("{} install -g openclaw --registry https://registry.npmmirror.com", npm_cmd);
+
+    window.emit("install-output", &format!("使用命令: {}", install_cmd)).map_err(|e| e.to_string())?;
+
+    let mut child = Command::new("cmd")
+        .args(["/C", &install_cmd])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
+    let mut reader = BufReader::new(stdout).lines();
+
+    while let Ok(Some(line)) = reader.next_line().await {
+        window.emit("install-output", &line).map_err(|e| e.to_string())?;
+    }
+
+    let status = child.wait().await.map_err(|e| e.to_string())?;
+    if status.success() {
+        window.emit("install-done", "success").map_err(|e| e.to_string())?;
+        run_shell("openclaw gateway install >NUL 2>&1 || true").await?;
+        run_shell("openclaw gateway restart >NUL 2>&1 || true").await?;
+        Ok(())
+    } else {
+        window.emit("install-done", "failed").map_err(|e| e.to_string())?;
+        Err("OpenClaw installation failed".to_string())
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn get_npx_command_for_windows() -> String {
+    let node_paths = [
+        r"C:\Program Files\nodejs",
+        r"C:\Program Files (x86)\nodejs",
+    ];
+    for path in &node_paths {
+        let npm_path = format!(r"{}\npm.cmd", path);
+        if std::path::Path::new(&npm_path).exists() {
+            return npm_path;
+        }
+    }
+    "npm.cmd".to_string()
+}
+
+#[tauri::command]
+pub async fn get_openclaw_info() -> Result<InstallInfo, String> {
+    #[cfg(target_os = "windows")]
+    {
+        get_openclaw_info_windows().await
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        get_openclaw_info_unix().await
+    }
+}
+
+#[cfg(target_os = "windows")]
+async fn get_openclaw_info_windows() -> Result<InstallInfo, String> {
+    let output = Command::new("cmd")
+        .args(["/C", "where openclaw 2>NUL"])
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    if path_str.is_empty() || path_str.contains("not find") {
+        return Ok(InstallInfo { installed: false, version: None, path: None });
+    }
+
+    let version_output = Command::new("cmd")
+        .args(["/C", "openclaw --version 2>NUL"])
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let version = String::from_utf8_lossy(&version_output.stdout)
+        .trim()
+        .to_string()
+        .replace("openclaw/", "");
+
+    Ok(InstallInfo {
+        installed: true,
+        version: Some(version),
+        path: Some(path_str),
+    })
+}
+
+#[cfg(not(target_os = "windows"))]
+async fn get_openclaw_info_unix() -> Result<InstallInfo, String> {
+    let output = run_shell_output("command -v openclaw").await?;
+    let path_str = output_text(&output).trim().to_string();
+
+    if path_str.is_empty() {
+        return Ok(InstallInfo { installed: false, version: None, path: None });
+    }
+
+    let version_output = run_shell_output("openclaw --version 2>/dev/null").await?;
+    let version = output_text(&version_output)
+        .trim()
+        .to_string()
+        .replace("openclaw/", "");
+
+    Ok(InstallInfo {
+        installed: true,
+        version: Some(version),
+        path: Some(path_str),
+    })
+}
+
+#[tauri::command]
+pub async fn get_node_info() -> Result<Option<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let output = Command::new("cmd")
+            .args(["/C", "node --version 2>NUL"])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+        let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if version.is_empty() || version.contains("not") {
+            Ok(None)
+        } else {
+            Ok(Some(version))
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let output = run_shell_output("node --version 2>/dev/null").await?;
+        let version = output_text(&output).trim().to_string();
+        if version.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(version))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn check_openclaw_version() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let output = Command::new("cmd")
+            .args(["/C", "openclaw --version 2>NUL"])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let output = run_shell_output("openclaw --version 2>/dev/null").await?;
+        Ok(output_text(&output).trim().to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn get_command_path(command: String) -> Result<Option<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let output = Command::new("cmd")
+            .args(["/C", &format!("where {} 2>NUL", command)])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if path.is_empty() || path.contains("not find") {
+            Ok(None)
+        } else {
+            Ok(Some(path))
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let output = run_shell_output(&format!("command -v {}", command)).await?;
+        let path = output_text(&output).trim().to_string();
+        if path.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(path))
+        }
+    }
+}
