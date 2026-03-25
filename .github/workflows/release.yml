@@ -3,7 +3,6 @@ name: Release
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -27,14 +26,11 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Tauri
-        run: npm run tauri build
+      - name: Build Electron
+        run: npm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -43,9 +39,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-bundle
-          path: |
-            src-tauri/target/release/bundle/dmg/**/*.dmg
-            src-tauri/target/release/bundle/app/**/*.app
+          path: release/**/*.dmg
           if-no-files-found: ignore
 
       - name: Upload Windows artifacts
@@ -53,15 +47,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-bundle
-          path: |
-            src-tauri/target/release/bundle/**/*.exe
-            src-tauri/target/release/bundle/**/*.msi
+          path: release/**/*.exe
           if-no-files-found: ignore
 
   release:
     name: Release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -72,22 +63,17 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
-        env:
-          TAG: ${{ github.ref_name }}
-
-      - name: Get current date
-        id: get_date
-        run: echo "DATE=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+      - name: Generate changelog
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          echo "CHANGELOG=ClawB v2.0.0 ($DATE)" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "${{ steps.get_date.outputs.DATE }}-${{ steps.get_version.outputs.VERSION }}"
           files: artifacts/**/*
           draft: false
           prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
