@@ -67,6 +67,16 @@ jobs:
         id: date
         run: echo "DATE=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
 
+      - name: Create tag
+        id: tag
+        run: |
+          TAG="v2.0.0-${DATE}"
+          git tag "$TAG"
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Push tag
+        run: git push origin ${{ steps.tag.outputs.TAG }}
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -74,6 +84,6 @@ jobs:
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
-          target_commitish: ${{ github.sha }}
+          tag: ${{ steps.tag.outputs.TAG }}
           name: "ClawB v2.0.0 (${{ steps.date.outputs.DATE }})"
           body: "ClawB v2.0.0 release built from ${{ github.sha }}"
