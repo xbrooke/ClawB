@@ -63,10 +63,9 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Generate changelog
-        run: |
-          DATE=$(date +%Y-%m-%d)
-          echo "CHANGELOG=ClawB v2.0.0 ($DATE)" >> $GITHUB_OUTPUT
+      - name: Get current date
+        id: date
+        run: echo "DATE=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -75,5 +74,6 @@ jobs:
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          target_commitish: ${{ github.sha }}
+          name: "ClawB v2.0.0 (${{ steps.date.outputs.DATE }})"
+          body: "ClawB v2.0.0 release built from ${{ github.sha }}"
